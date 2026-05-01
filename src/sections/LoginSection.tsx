@@ -14,9 +14,17 @@ export function LoginSection() {
   const [otp, setOtp] = useState('');
   const [otpRequested, setOtpRequested] = useState(false);
   const isSecurityCodeValid = securityCode === 'FWD#FRB65';
+  const normalizedMobile = mobile.trim();
+  const apiMobile = `91${normalizedMobile}`;
+  const isMobileValid = /^\d{10}$/.test(normalizedMobile);
+
+  const onMobileChange = (value: string) => {
+    const digitsOnly = value.replace(/\D/g, '');
+    setMobile(digitsOnly.slice(0, 10));
+  };
 
   const sendOtpMutation = useMutation({
-    mutationFn: () => sendOtp(mobile.trim(), purpose),
+    mutationFn: () => sendOtp(apiMobile, purpose),
     onSuccess: () => {
       setOtpRequested(true);
       dispatch(setNotice({ type: 'success', message: 'OTP sent successfully.' }));
@@ -27,7 +35,7 @@ export function LoginSection() {
   });
 
   const verifyOtpMutation = useMutation({
-    mutationFn: () => verifyOtp(mobile.trim(), otp.trim(), purpose),
+    mutationFn: () => verifyOtp(apiMobile, otp.trim(), purpose),
     onSuccess: (session) => {
       dispatch(setSession(session));
       setOtpRequested(false);
@@ -80,12 +88,17 @@ export function LoginSection() {
 
             <label className="form-stack">
               <span className="small">Mobile</span>
-              <input
-                value={mobile}
-                onChange={(event) => setMobile(event.target.value)}
-                placeholder="XXX-XXX-XXXX"
-                disabled={!isSecurityCodeValid}
-              />
+              <div className="mobile-input-row">
+                <input value="+91" disabled aria-label="Country code" style={{ maxWidth: 72 }} />
+                <input
+                  value={mobile}
+                  onChange={(event) => onMobileChange(event.target.value)}
+                  placeholder="10-digit mobile number"
+                  inputMode="numeric"
+                  maxLength={10}
+                  disabled={!isSecurityCodeValid}
+                />
+              </div>
             </label>
 
             <div className="form-row">
@@ -119,14 +132,14 @@ export function LoginSection() {
               <button
                 className="btn primary"
                 onClick={() => sendOtpMutation.mutate()}
-                disabled={busy || !isSecurityCodeValid}
+                disabled={busy || !isSecurityCodeValid || !isMobileValid}
               >
                 {sendOtpMutation.isPending ? 'Sending...' : otpRequested ? 'Resend OTP' : 'Send OTP'}
               </button>
               <button
                 className="btn secondary"
                 onClick={() => verifyOtpMutation.mutate()}
-                disabled={busy || !isSecurityCodeValid}
+                disabled={busy || !isSecurityCodeValid || !isMobileValid}
               >
                 {verifyOtpMutation.isPending ? 'Verifying...' : 'Verify OTP'}
               </button>

@@ -283,6 +283,18 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.mobile-input-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+}
+
+.mobile-input-row input:first-child {
+  width: 72px;
+  text-align: center;
+}
+
 .section-grid {
   display: grid;
   gap: 18px;

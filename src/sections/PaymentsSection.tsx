@@ -7,7 +7,7 @@ import { formatDate, initialQuery, money } from '../lib/ui';
 export function PaymentsSection() {
   const [paymentFilters, setPaymentFilters] = useState(
     initialQuery({
-      status: '', type: '', driverId: '', passengerId: '', dateFrom: '', dateTo: '', page: '1', limit: '10', sortBy: 'createdAt', sortOrder: 'desc',
+      status: '', type: '', dateFrom: '', dateTo: '', page: '1', limit: '10', sortBy: 'createdAt', sortOrder: 'desc',
     }),
   );
 
@@ -17,8 +17,6 @@ export function PaymentsSection() {
       listAdminPayments({
         status: paymentFilters.status,
         type: paymentFilters.type,
-        driverId: paymentFilters.driverId,
-        passengerId: paymentFilters.passengerId,
         dateFrom: paymentFilters.dateFrom,
         dateTo: paymentFilters.dateTo,
         page: Number(paymentFilters.page || 1),
@@ -41,7 +39,7 @@ export function PaymentsSection() {
         </button>
       </div>
       <div className="field-grid">
-        {(['status', 'type', 'driverId', 'passengerId', 'dateFrom', 'dateTo', 'page', 'limit'] as const).map((field) => (
+        {(['status', 'type', 'dateFrom', 'dateTo', 'page', 'limit'] as const).map((field) => (
           <label className="form-stack" key={field}>
             <span className="small">{field}</span>
             <input

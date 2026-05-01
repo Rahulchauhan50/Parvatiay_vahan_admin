@@ -197,7 +197,7 @@ export interface ApiEnvelope<T> {
   error?: { code?: string; message?: string; details?: unknown };
 }
 
-const DEFAULT_API_BASE = 'http://api.parvatiyavahan.com';
+const DEFAULT_API_BASE = 'https://api.parvatiyavahan.com';
 
 export function getApiBaseUrl(): string {
   const value = (import.meta as ImportMeta & { env?: { VITE_API_BASE_URL?: string } }).env
@@ -206,7 +206,7 @@ export function getApiBaseUrl(): string {
 
 
 
-  return 'http://api.parvatiyavahan.com';
+  return baseUrl;
 }
 
 /**
@@ -253,7 +253,6 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  console.log(getApiBaseUrl())
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     headers: {

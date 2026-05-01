@@ -23,7 +23,7 @@ export function PaymentsSection() {
         dateTo: paymentFilters.dateTo,
         page: Number(paymentFilters.page || 1),
         limit: Number(paymentFilters.limit || 10),
-        sortBy: paymentFilters.sortBy as 'createdAt' | 'amount' | 'status',
+        sortBy: paymentFilters.sortBy as 'createdAt' | 'amount',
         sortOrder: paymentFilters.sortOrder as 'asc' | 'desc',
       }),
     enabled: false,

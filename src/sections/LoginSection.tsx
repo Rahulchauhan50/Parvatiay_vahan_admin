@@ -8,7 +8,7 @@ import { setNotice } from '../store/uiSlice';
 
 export function LoginSection() {
   const dispatch = useAppDispatch();
-  const [mobile, setMobile] = useState('919625809384');
+  const [mobile, setMobile] = useState('');
   const [purpose, setPurpose] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
   const [securityCode, setSecurityCode] = useState('');
   const [otp, setOtp] = useState('');
@@ -83,7 +83,7 @@ export function LoginSection() {
               <input
                 value={mobile}
                 onChange={(event) => setMobile(event.target.value)}
-                placeholder="919625809384"
+                placeholder="XXX-XXX-XXXX"
                 disabled={!isSecurityCodeValid}
               />
             </label>

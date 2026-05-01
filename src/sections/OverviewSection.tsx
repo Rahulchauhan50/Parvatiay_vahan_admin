@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-import { getAdminMe, runAdminTestAction, type AuthSession } from '../lib/api';
+import { getAdminMe, runAdminTestAction, getStorageFileUrl, type AuthSession } from '../lib/api';
 import { useAppDispatch } from '../store/hooks';
 import { setNotice } from '../store/uiSlice';
 
@@ -22,6 +22,14 @@ export function OverviewSection({ session }: OverviewSectionProps) {
     queryKey: ['admin-me'],
     queryFn: getAdminMe,
   });
+
+  useEffect(() => {
+    if (meQuery.data) {
+      // keep a debug log outside of JSX to avoid returning void into the render tree
+      // eslint-disable-next-line no-console
+      console.log(meQuery.data);
+    }
+  }, [meQuery.data]);
 
   const testActionMutation = useMutation({
     mutationFn: () =>
@@ -53,8 +61,26 @@ export function OverviewSection({ session }: OverviewSectionProps) {
         </div>
         <div className="grid-stats">
           <div className="stat">
-            <div className="label">User ID</div>
-            <div className="value" style={{ fontSize: '1rem' }}>{meQuery.data?.admin.userId || session.user.id}</div>
+            <div className="label">Profile</div>
+            <div className="value" style={{ fontSize: '1rem' }}>
+              {(() => {
+                const admin = meQuery.data?.admin as any;
+                const displayName = admin?.name || admin?.userName || admin?.mobile.slice(2) || session.user.mobile || session.user.id;
+                const avatarPath = admin?.upload?.uploadUrl || admin?.avatar?.uploadUrl || admin?.photo?.uploadUrl || null;
+                const avatarUrl = avatarPath ? getStorageFileUrl(avatarPath) : null;
+
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt={String(displayName)} style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: 48, height: 48, borderRadius: 10, background: 'rgba(148,163,184,0.08)', display: 'grid', placeItems: 'center', color: 'var(--muted)', fontWeight: 700 }}>+91</div>
+                    )}
+                    <div>{displayName}</div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
           <div className="stat">
             <div className="label">Roles</div>

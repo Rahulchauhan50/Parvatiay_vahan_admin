@@ -172,22 +172,25 @@ export function DriverApplicationsSection() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       {doc.upload?.uploadUrl ? (
-                        <button
+                        <a
+                          href={getStorageFileUrl(doc.upload.uploadUrl)}
+                          
+                        target='_black'
                           className="btn ghost"
-                          onClick={() => {
-                            const rawUrl = doc.upload?.privateUrl || doc.upload?.uploadUrl;
-                            if (!rawUrl) return;
-                            const url = getStorageFileUrl(rawUrl);
-                            if (doc.mimeType?.startsWith('image/')) {
-                              setViewerUrl(url);
-                              setViewerMime(doc.mimeType);
-                            } else {
-                              window.open(url, '_blank');
-                            }
-                          }}
+                          // onClick={() => {
+                          //   const rawUrl = doc.upload?.privateUrl || doc.upload?.uploadUrl;
+                          //   if (!rawUrl) return;
+                          //   const url = getStorageFileUrl(rawUrl);
+                          //   if (doc.mimeType?.startsWith('image/')) {
+                          //     setViewerUrl(url);
+                          //     setViewerMime(doc.mimeType);
+                          //   } else {
+                          //     window.open(url, '_blank');
+                          //   }
+                          // }}
                         >
                           View
-                        </button>
+                        </a>
                       ) : null}
                       {doc.status !== 'VERIFIED' ? (
                         <button

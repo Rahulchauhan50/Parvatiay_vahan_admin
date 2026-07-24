@@ -97,6 +97,7 @@ export default function App() {
   const [allocationDriverId, setAllocationDriverId] = useState('');
   const [packageBookingPage, setPackageBookingPage] = useState(1);
   const [packageBookingLimit, setPackageBookingLimit] = useState(10);
+  const [copiedId, setCopiedId] = useState('');
 
   // Auth state
   const [isLoggedIn, setIsLoggedIn] = useState(!!api.getToken());
@@ -1764,14 +1765,11 @@ export default function App() {
                     <table>
                       <thead>
                         <tr>
-                          <th>Booking ID</th>
-                          <th>Passenger</th>
-                          <th>Package Info</th>
+                          <th>Booking ID & Passenger</th>
+                          <th>Package & Vehicle</th>
                           <th>Pickup & Destinations</th>
-                          <th>Travel Date</th>
-                          <th>Vehicle Type</th>
+                          <th>Travel Date & Status</th>
                           <th>Amount Details</th>
-                          <th>Allocation Status</th>
                           <th>Allocated Driver & Vehicle</th>
                           <th>Actions</th>
                         </tr>
@@ -1781,25 +1779,68 @@ export default function App() {
                           .slice((packageBookingPage - 1) * packageBookingLimit, packageBookingPage * packageBookingLimit)
                           .map((booking) => (
                             <tr key={booking.id}>
-                              <td style={{ fontFamily: 'monospace', fontSize: '0.74rem', fontWeight: 700 }} title={booking.id}>
-                                ...{booking.id.slice(-6)}
-                              </td>
                               <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                  <span style={{ fontFamily: 'monospace', fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 700 }} title={booking.id}>
+                                    ...{booking.id.slice(-6)}
+                                  </span>
+                                  <button 
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(booking.id);
+                                      setCopiedId(booking.id);
+                                      setTimeout(() => setCopiedId(''), 1500);
+                                    }}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      padding: 0,
+                                      cursor: 'pointer',
+                                      color: copiedId === booking.id ? 'var(--success)' : 'var(--text-muted)',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      position: 'relative'
+                                    }}
+                                    title="Copy Full Booking ID"
+                                  >
+                                    {copiedId === booking.id ? (
+                                      <span style={{ fontSize: '0.62rem', color: 'var(--success)', fontWeight: 'bold' }}>Copied!</span>
+                                    ) : (
+                                      <svg style={{ width: '12px', height: '12px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                </div>
                                 {(() => {
                                   const passengerObj = users.find(u => (u.id === booking.passengerUserId || u._id === booking.passengerUserId)) || booking.passengerSnapshot;
                                   return passengerObj ? (
-                                    <div>
-                                      <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{passengerObj.name}</div>
+                                    <div style={{ marginTop: '4px' }}>
+                                      <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main)' }}>{passengerObj.name}</div>
                                       <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>{passengerObj.mobile}</div>
                                     </div>
                                   ) : (
-                                    <div style={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{booking.passengerUserId || 'N/A'}</div>
+                                    <div style={{ fontSize: '0.74rem', fontFamily: 'monospace', color: 'var(--text-muted)', marginTop: '4px' }}>{booking.passengerUserId || 'N/A'}</div>
                                   );
                                 })()}
                               </td>
                               <td>
-                                <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{booking.packageTitle || 'Package Tour'}</div>
+                                <div style={{ fontWeight: 700, fontSize: '0.82rem' }}>{booking.packageTitle || 'Package Tour'}</div>
                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Code: {booking.packageCode || 'N/A'}</div>
+                                <div style={{ marginTop: '6px' }}>
+                                  <span style={{
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    padding: '2px 6px',
+                                    backgroundColor: 'var(--bg-main)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '4px',
+                                    color: 'var(--text-muted)',
+                                    textTransform: 'uppercase'
+                                  }}>
+                                    {booking.vehicleType || 'Any'}
+                                  </span>
+                                </div>
                               </td>
                               <td>
                                 <div style={{ fontSize: '0.8rem' }}>
@@ -1811,39 +1852,31 @@ export default function App() {
                                   </div>
                                 )}
                               </td>
-                              <td style={{ fontSize: '0.8rem' }}>{booking.travelDate ? new Date(booking.travelDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}</td>
                               <td>
-                                <span style={{
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700,
-                                  padding: '2px 6px',
-                                  backgroundColor: 'var(--bg-main)',
-                                  border: '1px solid var(--border)',
-                                  borderRadius: '12px'
-                                }}>
-                                  {booking.vehicleType || 'Any'}
-                                </span>
+                                <div style={{ fontWeight: 600, fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                                  📅 {booking.travelDate ? new Date(booking.travelDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                                </div>
+                                <div style={{ marginTop: '6px' }}>
+                                  <span className={`badge ${
+                                    booking.status === 'ALLOCATED' || booking.isDriverAllocated || booking.status === 'TRAVEL_START' ? 'badge-success' :
+                                    booking.status === 'CANCELLED' ? 'badge-error' : 'badge-warning'
+                                  }`} style={{ fontSize: '0.7rem', padding: '2px 6px' }}>
+                                    {(booking.status === 'ALLOCATED' || booking.isDriverAllocated || booking.status === 'TRAVEL_START') && <Icons.Check />}
+                                    {booking.status === 'REQUESTED' && <Icons.Clock />}
+                                    {booking.status === 'CANCELLED' && <Icons.Cross />}
+                                    {booking.status || 'REQUESTED'}
+                                  </span>
+                                </div>
                               </td>
                               <td>
                                 <div>
                                   <div style={{ fontWeight: 800, color: 'var(--secondary)', fontSize: '0.85rem' }}>₹{(booking.totalAmount ?? 0).toLocaleString()}</div>
-                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.2 }}>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.2, marginTop: '2px' }}>
                                     Adv: ₹{(booking.advanceAmount ?? 0).toLocaleString()}
                                     <br />
                                     Bal: ₹{(booking.balanceAmount ?? 0).toLocaleString()}
                                   </div>
                                 </div>
-                              </td>
-                              <td>
-                                <span className={`badge ${
-                                  booking.status === 'ALLOCATED' || booking.isDriverAllocated || booking.status === 'TRAVEL_START' ? 'badge-success' :
-                                  booking.status === 'CANCELLED' ? 'badge-error' : 'badge-warning'
-                                }`} style={{ fontSize: '0.7rem', padding: '2px 6px' }}>
-                                  {(booking.status === 'ALLOCATED' || booking.isDriverAllocated || booking.status === 'TRAVEL_START') && <Icons.Check />}
-                                  {booking.status === 'REQUESTED' && <Icons.Clock />}
-                                  {booking.status === 'CANCELLED' && <Icons.Cross />}
-                                  {booking.status || 'REQUESTED'}
-                                </span>
                               </td>
                               <td>
                                 {booking.isDriverAllocated || booking.driver || booking.allocatedDriverUserId ? (
@@ -1856,7 +1889,7 @@ export default function App() {
 
                                     return (
                                       <div>
-                                        <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>🧑‍✈️ {name}</div>
+                                        <div style={{ fontWeight: 700, fontSize: '0.82rem' }}>🧑‍✈️ {name}</div>
                                         {mobile && <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>{mobile}</div>}
                                         {vehicle && (
                                           <div style={{

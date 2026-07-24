@@ -1780,9 +1780,9 @@ export default function App() {
                           .map((booking) => (
                             <tr key={booking.id}>
                               <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                  <span style={{ fontFamily: 'monospace', fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 700 }} title={booking.id}>
-                                    ...{booking.id.slice(-6)}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
+                                  <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-main)', fontWeight: 700 }}>
+                                    {booking.id}
                                   </span>
                                   <button 
                                     onClick={() => {
@@ -1816,7 +1816,7 @@ export default function App() {
                                   const passengerObj = users.find(u => (u.id === booking.passengerUserId || u._id === booking.passengerUserId)) || booking.passengerSnapshot;
                                   return passengerObj ? (
                                     <div style={{ marginTop: '4px' }}>
-                                      <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main)' }}>{passengerObj.name}</div>
+                                      {passengerObj.name && <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main)' }}>{passengerObj.name}</div>}
                                       <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>{passengerObj.mobile}</div>
                                     </div>
                                   ) : (

@@ -5,6 +5,21 @@ export const getToken = () => localStorage.getItem('admin_token');
 export const setToken = (token) => localStorage.setItem('admin_token', token);
 export const clearToken = () => { localStorage.removeItem('admin_token'); localStorage.removeItem('admin_user'); };
 
+// Intercept all fetch requests to handle 401 Unauthorized globally
+const originalFetch = window.fetch;
+window.fetch = async function (...args) {
+  const res = await originalFetch(...args);
+  if (res.status === 401) {
+    const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+    if (!url.includes('/auth/otp/verify') && !url.includes('/auth/otp/send')) {
+      clearToken();
+      localStorage.removeItem('admin_refresh_token');
+      window.dispatchEvent(new Event('admin-unauthorized'));
+    }
+  }
+  return res;
+};
+
 // Auth: Send OTP
 export const sendLoginOtp = async (mobile) => {
   const res = await fetch(`${BASE_URL}/auth/otp/send`, {

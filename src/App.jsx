@@ -218,13 +218,20 @@ export default function App() {
     setTimeout(() => setAlert(null), 4000);
   };
 
-  // Check backend health on mount
+  // Check backend health on mount and handle global unauthorized redirect
   useEffect(() => {
     const checkHealth = async () => {
       const online = await api.checkBackendHealth();
       setBackendOnline(online);
     };
     checkHealth();
+
+    const handleUnauthorizedEvent = () => {
+      setIsLoggedIn(false);
+      triggerAlert('error', 'Session expired. Please login again.');
+    };
+    window.addEventListener('admin-unauthorized', handleUnauthorizedEvent);
+    return () => window.removeEventListener('admin-unauthorized', handleUnauthorizedEvent);
   }, []);
 
   // OTP countdown timer

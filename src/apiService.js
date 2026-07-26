@@ -242,6 +242,44 @@ export const allocatePackageBooking = async (bookingId, driverId, vehicleId) => 
   return data.data || data;
 };
 
+// Predefined Locations Management APIs
+export const listAdminLocations = async () => {
+  const res = await fetch(`${BASE_URL}/admin/locations`, {
+    headers: { Authorization: `Bearer ${getToken()}` }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Unauthorized');
+  return data.data || data;
+};
+
+export const createAdminLocation = async (locationData) => {
+  const res = await fetch(`${BASE_URL}/admin/locations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify(locationData)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to create location');
+  return data.data || data;
+};
+
+export const updateAdminLocation = async (id, locationData) => {
+  const res = await fetch(`${BASE_URL}/admin/locations/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify(locationData)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to update location');
+  return data.data || data;
+};
+
 // Stub functions so App.jsx doesn't break if it references old exports
 export const getMockMode = () => false;
 export const setMockMode = () => {};

@@ -99,6 +99,17 @@ export default function App() {
   const [packageBookingLimit, setPackageBookingLimit] = useState(10);
   const [copiedId, setCopiedId] = useState('');
 
+  // Predefined Locations state
+  const [locations, setLocations] = useState([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locationName, setLocationName] = useState('');
+  const [locationLat, setLocationLat] = useState('');
+  const [locationLng, setLocationLng] = useState('');
+  const [locationModalError, setLocationModalError] = useState('');
+  const [savingLocation, setSavingLocation] = useState(false);
+
   // Auth state
   const [isLoggedIn, setIsLoggedIn] = useState(!!api.getToken());
   const [loginMobile, setLoginMobile] = useState('+91');
@@ -322,6 +333,10 @@ export default function App() {
         ]);
         setPackageBookings(bookingsData.bookings || []);
         setUsers(usersData.users || []);
+      } else if (currentTab === 'locations') {
+        setLoadingLocations(true);
+        const data = await api.listAdminLocations();
+        setLocations(data.locations || []);
       }
     } catch (err) {
       console.error(err);
@@ -338,12 +353,81 @@ export default function App() {
       setLoadingBookings(false);
       setLoadingPricing(false);
       setLoadingPackageBookings(false);
+      setLoadingLocations(false);
     }
   };
 
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  // Location Actions
+  const handleOpenAddLocationModal = () => {
+    setSelectedLocation(null);
+    setLocationName('');
+    setLocationLat('');
+    setLocationLng('');
+    setLocationModalError('');
+    setShowLocationModal(true);
+  };
+
+  const handleOpenEditLocationModal = (loc) => {
+    setSelectedLocation(loc);
+    setLocationName(loc.name);
+    setLocationLat(loc.latitude !== undefined && loc.latitude !== null ? loc.latitude.toString() : '');
+    setLocationLng(loc.longitude !== undefined && loc.longitude !== null ? loc.longitude.toString() : '');
+    setLocationModalError('');
+    setShowLocationModal(true);
+  };
+
+  const handleSaveLocation = async (e) => {
+    e.preventDefault();
+    if (!locationName.trim()) {
+      setLocationModalError('Location name is required.');
+      return;
+    }
+    setSavingLocation(true);
+    setLocationModalError('');
+
+    const payload = {
+      name: locationName.trim(),
+      latitude: locationLat.trim() ? parseFloat(locationLat) : undefined,
+      longitude: locationLng.trim() ? parseFloat(locationLng) : undefined,
+    };
+
+    try {
+      if (selectedLocation) {
+        // Edit location
+        const res = await api.updateAdminLocation(selectedLocation._id || selectedLocation.id, payload);
+        const updated = res.location || res.data || res;
+        setLocations(prev => prev.map(l => (l._id === (selectedLocation._id || selectedLocation.id) || l.id === (selectedLocation._id || selectedLocation.id)) ? { ...l, ...updated } : l));
+        triggerAlert('success', 'Location updated successfully.');
+      } else {
+        // Add location
+        const res = await api.createAdminLocation(payload);
+        const created = res.location || res.data || res;
+        setLocations(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+        triggerAlert('success', 'Location added successfully.');
+      }
+      setShowLocationModal(false);
+    } catch (err) {
+      setLocationModalError(err.message || 'Failed to save location.');
+    } finally {
+      setSavingLocation(false);
+    }
+  };
+
+  const handleToggleLocationStatus = async (loc) => {
+    const locId = loc._id || loc.id;
+    const nextActive = !loc.isActive;
+    try {
+      await api.updateAdminLocation(locId, { isActive: nextActive });
+      setLocations(prev => prev.map(l => (l._id === locId || l.id === locId) ? { ...l, isActive: nextActive } : l));
+      triggerAlert('success', `Location ${nextActive ? 'enabled' : 'disabled'} successfully.`);
+    } catch (err) {
+      triggerAlert('error', 'Failed to update location status.');
+    }
   };
 
   // User Actions
@@ -846,6 +930,16 @@ export default function App() {
               <line x1="12" y1="22.08" x2="12" y2="12" />
             </svg>
             Packages
+          </button>
+          <button 
+            className={`menu-item ${currentTab === 'locations' ? 'active' : ''}`}
+            onClick={() => navigateToTab('locations')}
+          >
+            <svg className="menu-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            Locations
           </button>
         </nav>
 
@@ -1850,7 +1944,7 @@ export default function App() {
                                   <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '4px', maxWidth: '150px', whiteSpace: 'normal', lineHeight: 1.2 }}>
                                     To: {booking.destinations.join(' → ')}
                                   </div>
-                                )}
+                                  )}
                               </td>
                               <td>
                                 <div style={{ fontWeight: 600, fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
@@ -1944,6 +2038,86 @@ export default function App() {
                     false
                   )}
                 </>
+              )}
+            </div>
+          )}
+
+          {/* LOCATIONS TAB */}
+          {currentTab === 'locations' && (
+            <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h3>Predefined Locations Management</h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                    Add, edit, or disable preset locations. Drivers and passengers will select from this list when creating or searching rides.
+                  </p>
+                </div>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={handleOpenAddLocationModal}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'bold' }}
+                >
+                  + Add Location
+                </button>
+              </div>
+
+              {loadingLocations ? (
+                <div style={{ color: 'var(--text-muted)' }}>Loading predefined locations...</div>
+              ) : locations.length === 0 ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  No predefined locations are currently configured. Click "+ Add Location" to create one.
+                </div>
+              ) : (
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Location Name</th>
+                        <th>Latitude (Optional)</th>
+                        <th>Longitude (Optional)</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {locations.map((loc) => (
+                        <tr key={loc._id || loc.id}>
+                          <td style={{ fontWeight: 700 }}>{loc.name}</td>
+                          <td style={{ fontFamily: 'monospace' }}>
+                            {loc.latitude !== undefined && loc.latitude !== null ? loc.latitude : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Not specified</span>}
+                          </td>
+                          <td style={{ fontFamily: 'monospace' }}>
+                            {loc.longitude !== undefined && loc.longitude !== null ? loc.longitude : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Not specified</span>}
+                          </td>
+                          <td>
+                            <span className={`badge ${loc.isActive ? 'badge-success' : 'badge-error'}`} style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+                              {loc.isActive ? <Icons.Check /> : <Icons.Cross />}
+                              {loc.isActive ? 'Active' : 'Disabled'}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button 
+                                className="btn btn-outline" 
+                                onClick={() => handleOpenEditLocationModal(loc)}
+                                style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+                              >
+                                Edit
+                              </button>
+                              <button 
+                                className={`btn ${loc.isActive ? 'btn-danger' : 'btn-primary'}`}
+                                onClick={() => handleToggleLocationStatus(loc)}
+                                style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+                              >
+                                {loc.isActive ? 'Disable' : 'Enable'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}
@@ -2097,6 +2271,76 @@ export default function App() {
                   }
                 >
                   Allocate & Confirm
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* LOCATION FORM MODAL */}
+      {showLocationModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>{selectedLocation ? 'Edit Predefined Location' : 'Add Predefined Location'}</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                Define a location name and optional coordinates. This name will appear in selection lists across the passenger and driver apps.
+              </p>
+            </div>
+            <form onSubmit={handleSaveLocation}>
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label">Location Name</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="e.g. Haridwar Bus Stand, Dehradun ISBT"
+                  value={locationName}
+                  onChange={(e) => setLocationName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Latitude (Optional)</label>
+                  <input 
+                    type="number" 
+                    step="any"
+                    className="form-control" 
+                    placeholder="e.g. 29.9457"
+                    value={locationLat}
+                    onChange={(e) => setLocationLat(e.target.value)}
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Longitude (Optional)</label>
+                  <input 
+                    type="number" 
+                    step="any"
+                    className="form-control" 
+                    placeholder="e.g. 78.1642"
+                    value={locationLng}
+                    onChange={(e) => setLocationLng(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {locationModalError && (
+                <div style={{ color: 'var(--error)', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+                  ⚠️ {locationModalError}
+                </div>
+              )}
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setShowLocationModal(false)}>
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-secondary"
+                  disabled={savingLocation}
+                >
+                  {savingLocation ? 'Saving...' : 'Save Location'}
                 </button>
               </div>
             </form>

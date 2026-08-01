@@ -1763,6 +1763,16 @@ export default function App() {
                         onChange={(e) => handlePricingChange('cancellationChargePercent', Number(e.target.value))}
                       />
                     </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Full Taxi Booking Advance (₹)</label>
+                      <input 
+                        type="number" 
+                        className="form-control" 
+                        value={pricing.fullTaxiBookingAdvance ?? 1000}
+                        onChange={(e) => handlePricingChange('fullTaxiBookingAdvance', Number(e.target.value))}
+                      />
+                    </div>
                   </div>
 
                   <hr style={{ margin: '2rem 0', borderColor: 'var(--border)' }} />

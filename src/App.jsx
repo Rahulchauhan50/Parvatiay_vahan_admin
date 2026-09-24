@@ -2538,6 +2538,459 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* USER PROFILE MODAL */}
+      {showUserProfileModal && selectedUserProfile && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  background: 'var(--primary-light)',
+                  color: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: '1.1rem'
+                }}>
+                  {(selectedUserProfile.name || 'U').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 style={{ margin: 0 }}>{selectedUserProfile.name || 'User Profile'}</h3>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                    ID: {selectedUserProfile.id || selectedUserProfile._id}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div style={{ background: 'var(--bg-main)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Mobile</span>
+                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedUserProfile.mobile || '—'}</span>
+              </div>
+              <div style={{ background: 'var(--bg-main)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Email</span>
+                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{selectedUserProfile.email || 'Not provided'}</span>
+              </div>
+              <div style={{ background: 'var(--bg-main)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Account Status</span>
+                <div>
+                  <span className={`badge ${selectedUserProfile.accountStatus === 'ACTIVE' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.75rem' }}>
+                    {selectedUserProfile.accountStatus || 'ACTIVE'}
+                  </span>
+                </div>
+              </div>
+              <div style={{ background: 'var(--bg-main)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Roles</span>
+                <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                  {(selectedUserProfile.roles || ['PASSENGER']).map(r => (
+                    <span key={r} className="badge badge-info" style={{ fontSize: '0.72rem' }}>{r}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {selectedUserProfile.vehicle && (
+              <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', marginBottom: '1.25rem' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  🚗 Vehicle Details
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '0.85rem' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Make & Model: </span>
+                    <strong>{selectedUserProfile.vehicle.make || ''} {selectedUserProfile.vehicle.model || ''}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Reg Number: </span>
+                    <strong style={{ fontFamily: 'monospace' }}>{selectedUserProfile.vehicle.registrationNumber || '—'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Color: </span>
+                    <span>{selectedUserProfile.vehicle.color || '—'}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Seat Capacity: </span>
+                    <span>{selectedUserProfile.vehicle.seatCapacity || 4} Seats</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              <span>Created: {selectedUserProfile.createdAt ? new Date(selectedUserProfile.createdAt).toLocaleDateString() : '—'}</span>
+              <span>Updated: {selectedUserProfile.updatedAt ? new Date(selectedUserProfile.updatedAt).toLocaleDateString() : '—'}</span>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-outline" onClick={() => setShowUserProfileModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RIDE DETAILS MODAL */}
+      {showRideDetailsModal && selectedRideDetails && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '650px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 0.25rem 0' }}>Ride Details</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      ID: {selectedRideDetails.id}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedRideDetails.id);
+                        setCopiedId(selectedRideDetails.id);
+                        setTimeout(() => setCopiedId(''), 1500);
+                      }}
+                      className="btn btn-outline"
+                      style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', lineHeight: 1 }}
+                      title="Copy Ride ID"
+                    >
+                      {copiedId === selectedRideDetails.id ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+                <span className={`badge ${selectedRideDetails.status === 'COMPLETED' ? 'badge-success' : selectedRideDetails.status === 'CANCELLED' ? 'badge-danger' : 'badge-info'}`}>
+                  {selectedRideDetails.status}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <div style={{ fontWeight: 700, fontSize: '1rem' }}>
+                  📍 {selectedRideDetails.origin?.name || selectedRideDetails.pickupPoint || 'Dehradun'} → {selectedRideDetails.destination?.name || selectedRideDetails.dropPoint || 'Destination'}
+                </div>
+                {selectedRideDetails.distanceKm && (
+                  <span className="badge badge-info" style={{ fontSize: '0.72rem' }}>{selectedRideDetails.distanceKm} km</span>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                <div>
+                  🗓️ Departure: <strong style={{ color: 'var(--text-main)' }}>{selectedRideDetails.departureAt ? new Date(selectedRideDetails.departureAt).toLocaleString() : '—'}</strong>
+                </div>
+                <div>
+                  💰 Price per Seat: <strong style={{ color: 'var(--text-main)' }}>₹{selectedRideDetails.pricePerSeat || selectedRideDetails.fare || 0}</strong>
+                </div>
+                <div>
+                  🚗 Vehicle Type: <strong style={{ color: 'var(--text-main)' }}>{(selectedRideDetails.vehicleType || 'DZIRE').replace('_', ' ')}</strong>
+                </div>
+                <div>
+                  👥 Available Seats: <strong style={{ color: 'var(--text-main)' }}>{selectedRideDetails.availableSeats ?? '—'} / {selectedRideDetails.totalSeats ?? 4}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', marginBottom: '1rem' }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Assigned Driver & Vehicle
+              </h4>
+              {selectedRideDetails.driver ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.85rem' }}>
+                  <div>Name: <strong>{selectedRideDetails.driver.name}</strong></div>
+                  <div>Mobile: <strong>{selectedRideDetails.driver.mobile}</strong></div>
+                  {selectedRideDetails.driver.vehicle && (
+                    <>
+                      <div>Vehicle: <strong>{selectedRideDetails.driver.vehicle.make} {selectedRideDetails.driver.vehicle.model}</strong></div>
+                      <div>Reg: <strong style={{ fontFamily: 'monospace' }}>{selectedRideDetails.driver.vehicle.registrationNumber}</strong></div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No driver allocated to this ride.</div>
+              )}
+            </div>
+
+            {selectedRideDetails.cancellationReason && (
+              <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--error)', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                <strong style={{ color: 'var(--error)' }}>Cancellation Reason: </strong>
+                <span>{selectedRideDetails.cancellationReason}</span>
+              </div>
+            )}
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-outline" onClick={() => setShowRideDetailsModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RESCHEDULE RIDE MODAL */}
+      {showRescheduleModal && rescheduleRide && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3>Reschedule Ride</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                Update departure date and time for Ride #{rescheduleRide.id}. Passengers will be notified.
+              </p>
+            </div>
+            <form onSubmit={handleRescheduleRideSubmit}>
+              <div style={{ background: 'var(--bg-main)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+                <div><strong>Current Departure:</strong> {new Date(rescheduleRide.departureAt).toLocaleString()}</div>
+                <div style={{ marginTop: '0.25rem', color: 'var(--text-muted)' }}>
+                  Route: {rescheduleRide.origin?.name || rescheduleRide.pickupPoint || 'Dehradun'} → {rescheduleRide.destination?.name || rescheduleRide.dropPoint}
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label">New Departure Date & Time</label>
+                <input
+                  type="datetime-local"
+                  className="form-control"
+                  value={rescheduleDateTime}
+                  onChange={(e) => setRescheduleDateTime(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setShowRescheduleModal(false)} disabled={processingRideAction}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-secondary" disabled={!rescheduleDateTime || processingRideAction}>
+                  {processingRideAction ? 'Rescheduling...' : 'Confirm Reschedule'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CANCEL RIDE MODAL */}
+      {showCancelRideModal && cancelRideTarget && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h3 style={{ color: 'var(--error)' }}>Cancel Ride</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                Cancel scheduled Ride #{cancelRideTarget.id}.
+              </p>
+            </div>
+            <form onSubmit={handleCancelRideSubmit}>
+              <div style={{ padding: '0.85rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid var(--error)', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+                ⚠️ <strong>Warning:</strong> Cancelling this ride will notify all passengers and initiate automated refunds for confirmed bookings.
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label">Cancellation Reason</label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  placeholder="e.g. Schedule conflict, bad weather conditions, operational maintenance..."
+                  value={cancelRideReason}
+                  onChange={(e) => setCancelRideReason(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setShowCancelRideModal(false)} disabled={processingRideAction}>
+                  Close
+                </button>
+                <button type="submit" className="btn btn-danger" disabled={!cancelRideReason.trim() || processingRideAction}>
+                  {processingRideAction ? 'Processing...' : 'Cancel Ride & Refund Passengers'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PACKAGE BOOKING DETAILS MODAL */}
+      {showPackageDetailsModal && selectedPackageDetails && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '650px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 0.25rem 0' }}>{selectedPackageDetails.packageTitle || selectedPackageDetails.packageCode || 'Package Booking'}</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      ID: {selectedPackageDetails.id}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedPackageDetails.id);
+                        setCopiedId(selectedPackageDetails.id);
+                        setTimeout(() => setCopiedId(''), 1500);
+                      }}
+                      className="btn btn-outline"
+                      style={{ padding: '0.15rem 0.4rem', fontSize: '0.68rem', lineHeight: 1 }}
+                      title="Copy Booking ID"
+                    >
+                      {copiedId === selectedPackageDetails.id ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+                <span className={`badge ${selectedPackageDetails.status === 'COMPLETED' ? 'badge-success' : selectedPackageDetails.status === 'CANCELLED' ? 'badge-danger' : 'badge-info'}`}>
+                  {selectedPackageDetails.status}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', marginBottom: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '0.85rem' }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Travel Date: </span>
+                  <strong>{selectedPackageDetails.travelDate ? new Date(selectedPackageDetails.travelDate).toLocaleDateString() : '—'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Pickup Point: </span>
+                  <strong>{selectedPackageDetails.pickupPoint || 'Dehradun'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Vehicle Type: </span>
+                  <strong>{(selectedPackageDetails.vehicleType || 'DZIRE_NON_AC').replace(/_/g, ' ')}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Dham Count: </span>
+                  <strong>{selectedPackageDetails.dhamCount || 1} Dham</strong>
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Destinations: </span>
+                  <strong>{Array.isArray(selectedPackageDetails.destinations) ? selectedPackageDetails.destinations.join(', ') : selectedPackageDetails.destinations || '—'}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', marginBottom: '1rem' }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Payment & Billing
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', fontSize: '0.85rem' }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Total Amount</span>
+                  <strong style={{ fontSize: '1rem', color: 'var(--primary)' }}>₹{(selectedPackageDetails.totalAmount || 0).toLocaleString()}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Advance Paid</span>
+                  <strong style={{ fontSize: '1rem', color: 'var(--success)' }}>₹{(selectedPackageDetails.advanceAmount || 0).toLocaleString()}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Balance Due</span>
+                  <strong style={{ fontSize: '1rem', color: 'var(--warning)' }}>₹{(selectedPackageDetails.balanceAmount || 0).toLocaleString()}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', marginBottom: '1rem' }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Allocated Driver & Vehicle
+              </h4>
+              {selectedPackageDetails.driver ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.85rem' }}>
+                  <div>Driver: <strong>{selectedPackageDetails.driver.name}</strong></div>
+                  <div>Mobile: <strong>{selectedPackageDetails.driver.mobile}</strong></div>
+                  {selectedPackageDetails.driver.vehicle && (
+                    <>
+                      <div>Vehicle: <strong>{selectedPackageDetails.driver.vehicle.make} {selectedPackageDetails.driver.vehicle.model}</strong></div>
+                      <div>Registration: <strong style={{ fontFamily: 'monospace' }}>{selectedPackageDetails.driver.vehicle.registrationNumber}</strong></div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Not Allocated yet</span>
+              )}
+            </div>
+
+            {selectedPackageDetails.notes && (
+              <div style={{ padding: '0.75rem', background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Notes: </span>
+                <span>{selectedPackageDetails.notes}</span>
+              </div>
+            )}
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-outline" onClick={() => setShowPackageDetailsModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT PACKAGE BOOKING MODAL */}
+      {showEditPackageModal && editPackageBooking && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h3>Edit Package Booking</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                Update booking details for #{editPackageBooking.id}.
+              </p>
+            </div>
+            <form onSubmit={handleUpdatePackageBookingSubmit}>
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Travel Date</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={editTravelDate}
+                  onChange={(e) => setEditTravelDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Pickup Point</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={editPickupPoint}
+                  onChange={(e) => setEditPickupPoint(e.target.value)}
+                  placeholder="e.g. DEHRADUN, HARIDWAR, RISHIKESH"
+                  required
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Destinations (Comma-separated)</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={editDestinations}
+                  onChange={(e) => setEditDestinations(e.target.value)}
+                  placeholder="e.g. Kedarnath, Badrinath"
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label">Notes / Special Instructions</label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="Additional passenger preferences or notes..."
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline" onClick={() => setShowEditPackageModal(false)} disabled={savingPackageEdit}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-secondary" disabled={savingPackageEdit}>
+                  {savingPackageEdit ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

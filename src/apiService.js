@@ -338,6 +338,32 @@ export const adminUpdatePackageBooking = async (bookingId, updateData) => {
   return data.data || data;
 };
 
+export const getAdminUserDetail = async (userId) => {
+  const res = await fetch(`${BASE_URL}/admin/users/${userId}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${getToken()}`
+    }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to fetch user details');
+  return data.data || data;
+};
+
+export const updateAdminUser = async (userId, userData) => {
+  const res = await fetch(`${BASE_URL}/admin/users/${userId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify(userData)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to update user');
+  return data.data || data;
+};
+
 // Stub functions so App.jsx doesn't break if it references old exports
 export const getMockMode = () => false;
 export const setMockMode = () => {};

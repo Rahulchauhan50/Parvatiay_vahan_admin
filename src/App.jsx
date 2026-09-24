@@ -99,9 +99,15 @@ export default function App() {
   const [packageBookingLimit, setPackageBookingLimit] = useState(10);
   const [copiedId, setCopiedId] = useState('');
 
-  // --- USER PROFILE MODAL STATE ---
+  // --- USER COMPLETE PROFILE PAGE & EDIT STATE ---
   const [selectedUserProfile, setSelectedUserProfile] = useState(null);
   const [showUserProfileModal, setShowUserProfileModal] = useState(false);
+  const [viewingUserProfile, setViewingUserProfile] = useState(null);
+  const [loadingUserProfile, setLoadingUserProfile] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editProfileForm, setEditProfileForm] = useState(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [previewDocModal, setPreviewDocModal] = useState(null);
 
   // --- RIDE DETAILS & ACTIONS STATE ---
   const [selectedRideDetails, setSelectedRideDetails] = useState(null);
@@ -125,6 +131,150 @@ export default function App() {
   const [editNotes, setEditNotes] = useState('');
   const [savingPackageEdit, setSavingPackageEdit] = useState(false);
 
+
+  // --- COMPLETE PROFILE PAGE HANDLERS ---
+  const handleOpenUserProfile = async (user) => {
+    setViewingUserProfile(user);
+    setLoadingUserProfile(true);
+    try {
+      const data = await api.getAdminUserDetail(user.id || user._id);
+      if (data && data.user) {
+        setViewingUserProfile({
+          ...user,
+          ...data.user,
+          vehicle: data.vehicle || user.vehicle,
+          documents: data.documents || [],
+          application: data.application || null,
+        });
+      }
+    } catch (err) {
+      console.warn('Could not fetch deep user profile:', err);
+    } finally {
+      setLoadingUserProfile(false);
+    }
+  };
+
+  const handleOpenEditProfileModal = (user) => {
+    const kyc = user.driverKyc || {};
+    const aadhaar = kyc.aadhaar || {};
+    const pan = kyc.pan || {};
+    const bank = kyc.bank || {};
+    const acc = user.accountInfo || {};
+    const vehicle = user.vehicle || {};
+    const caps = user.capabilities || {};
+
+    setEditProfileForm({
+      name: user.name || '',
+      mobile: user.mobile || '',
+      email: user.email || '',
+      gender: user.gender || 'OTHER',
+      accountStatus: user.accountStatus || 'ACTIVE',
+      roles: Array.isArray(user.roles) ? [...user.roles] : ['PASSENGER'],
+      driverStatus: user.driverStatus || 'NOT_APPLIED',
+      canBookRide: caps.canBookRide !== false,
+      canOfferRide: !!caps.canOfferRide,
+      canManageRequests: !!caps.canManageRequests,
+      accountHolderName: acc.accountHolderName || bank.nameAtBank || '',
+      accountNumber: acc.accountNumber || bank.accountNumberMasked || '',
+      ifscCode: acc.ifscCode || bank.ifscCode || '',
+      branchName: acc.branchName || '',
+      upiId: user.upiId || '',
+      // Aadhaar
+      aadhaarVerified: !!aadhaar.verified,
+      aadhaarNumberMasked: aadhaar.aadhaarNumberMasked || '',
+      aadhaarName: aadhaar.name || '',
+      // PAN
+      panVerified: !!pan.verified,
+      panNumber: pan.panNumber || '',
+      panName: pan.registeredName || '',
+      // Bank
+      bankVerified: !!bank.verified,
+      bankAccountNumber: bank.accountNumberMasked || acc.accountNumber || '',
+      bankIfsc: bank.ifscCode || acc.ifscCode || '',
+      bankName: bank.bankName || '',
+      bankNameAtBank: bank.nameAtBank || acc.accountHolderName || '',
+      // Vehicle
+      vehicleMake: vehicle.make || '',
+      vehicleModel: vehicle.model || '',
+      vehicleColor: vehicle.color || '',
+      vehicleReg: vehicle.registrationNumber || '',
+      vehicleSeats: vehicle.seatCapacity || 4,
+    });
+    setShowEditProfileModal(true);
+  };
+
+  const handleSaveProfileSubmit = async (e) => {
+    e.preventDefault();
+    if (!viewingUserProfile || !editProfileForm) return;
+    setSavingProfile(true);
+    try {
+      const payload = {
+        name: editProfileForm.name,
+        mobile: editProfileForm.mobile,
+        email: editProfileForm.email,
+        gender: editProfileForm.gender,
+        accountStatus: editProfileForm.accountStatus,
+        driverStatus: editProfileForm.driverStatus,
+        roles: editProfileForm.roles,
+        upiId: editProfileForm.upiId,
+        capabilities: {
+          canBookRide: editProfileForm.canBookRide,
+          canOfferRide: editProfileForm.canOfferRide,
+          canManageRequests: editProfileForm.canManageRequests,
+        },
+        accountInfo: {
+          accountHolderName: editProfileForm.accountHolderName,
+          accountNumber: editProfileForm.accountNumber,
+          ifscCode: editProfileForm.ifscCode,
+          branchName: editProfileForm.branchName,
+        },
+        driverKyc: {
+          aadhaar: {
+            verified: editProfileForm.aadhaarVerified,
+            aadhaarNumberMasked: editProfileForm.aadhaarNumberMasked,
+            name: editProfileForm.aadhaarName,
+          },
+          pan: {
+            verified: editProfileForm.panVerified,
+            panNumber: editProfileForm.panNumber,
+            registeredName: editProfileForm.panName,
+          },
+          bank: {
+            verified: editProfileForm.bankVerified,
+            accountNumberMasked: editProfileForm.bankAccountNumber,
+            ifscCode: editProfileForm.bankIfsc,
+            bankName: editProfileForm.bankName,
+            nameAtBank: editProfileForm.bankNameAtBank,
+          },
+        },
+        vehicle: {
+          make: editProfileForm.vehicleMake,
+          model: editProfileForm.vehicleModel,
+          color: editProfileForm.vehicleColor,
+          registrationNumber: editProfileForm.vehicleReg,
+          seatCapacity: Number(editProfileForm.vehicleSeats) || 4,
+        },
+      };
+
+      const updated = await api.updateAdminUser(viewingUserProfile.id || viewingUserProfile._id, payload);
+      const updatedUser = updated.user || updated;
+      const mergedUser = {
+        ...viewingUserProfile,
+        ...updatedUser,
+        vehicle: updated.vehicle || (payload.vehicle?.registrationNumber ? payload.vehicle : viewingUserProfile.vehicle),
+        documents: updated.documents || viewingUserProfile.documents || [],
+      };
+
+      setViewingUserProfile(mergedUser);
+      setUsers(prev => prev.map(u => (u.id === mergedUser.id || u._id === mergedUser.id) ? { ...u, ...mergedUser } : u));
+      triggerAlert('success', `Profile & KYC for ${mergedUser.name || mergedUser.id} updated successfully!`);
+      setShowEditProfileModal(false);
+    } catch (err) {
+      triggerAlert('error', err.message || 'Failed to update profile');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   // Predefined Locations state
   const [locations, setLocations] = useState([]);
@@ -1341,7 +1491,7 @@ export default function App() {
                             <td>
                                 <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                                   <button 
-                                    onClick={() => { setSelectedUserProfile(user); setShowUserProfileModal(true); }}
+                                    onClick={() => handleOpenUserProfile(user)}
                                     className="btn btn-outline"
                                     style={{ fontSize: '0.75rem', padding: '0.4rem 0.75rem', whiteSpace: 'nowrap' }}
                                     title="View Complete Profile & KYC"

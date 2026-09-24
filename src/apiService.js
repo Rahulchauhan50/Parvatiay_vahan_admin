@@ -295,6 +295,49 @@ export const updateAdminLocation = async (id, locationData) => {
   return data.data || data;
 };
 
+
+export const adminCancelRide = async (rideId, reason) => {
+  const res = await fetch(`${BASE_URL}/admin/rides/${rideId}/cancel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify({ reason: reason || 'Cancelled by admin' })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to cancel ride');
+  return data.data || data;
+};
+
+export const adminRescheduleRide = async (rideId, departureAt, reason) => {
+  const res = await fetch(`${BASE_URL}/admin/rides/${rideId}/reschedule`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify({ departureAt, reason })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to reschedule ride');
+  return data.data || data;
+};
+
+export const adminUpdatePackageBooking = async (bookingId, updateData) => {
+  const res = await fetch(`${BASE_URL}/admin/package-bookings/${bookingId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify(updateData)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to update package booking');
+  return data.data || data;
+};
+
 // Stub functions so App.jsx doesn't break if it references old exports
 export const getMockMode = () => false;
 export const setMockMode = () => {};

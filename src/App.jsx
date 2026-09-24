@@ -99,6 +99,33 @@ export default function App() {
   const [packageBookingLimit, setPackageBookingLimit] = useState(10);
   const [copiedId, setCopiedId] = useState('');
 
+  // --- USER PROFILE MODAL STATE ---
+  const [selectedUserProfile, setSelectedUserProfile] = useState(null);
+  const [showUserProfileModal, setShowUserProfileModal] = useState(false);
+
+  // --- RIDE DETAILS & ACTIONS STATE ---
+  const [selectedRideDetails, setSelectedRideDetails] = useState(null);
+  const [showRideDetailsModal, setShowRideDetailsModal] = useState(false);
+  const [rescheduleRide, setRescheduleRide] = useState(null);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleDateTime, setRescheduleDateTime] = useState('');
+  const [cancelRideTarget, setCancelRideTarget] = useState(null);
+  const [showCancelRideModal, setShowCancelRideModal] = useState(false);
+  const [cancelRideReason, setCancelRideReason] = useState('');
+  const [processingRideAction, setProcessingRideAction] = useState(false);
+
+  // --- PACKAGE BOOKING DETAILS & EDIT STATE ---
+  const [selectedPackageDetails, setSelectedPackageDetails] = useState(null);
+  const [showPackageDetailsModal, setShowPackageDetailsModal] = useState(false);
+  const [editPackageBooking, setEditPackageBooking] = useState(null);
+  const [showEditPackageModal, setShowEditPackageModal] = useState(false);
+  const [editTravelDate, setEditTravelDate] = useState('');
+  const [editPickupPoint, setEditPickupPoint] = useState('');
+  const [editDestinations, setEditDestinations] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [savingPackageEdit, setSavingPackageEdit] = useState(false);
+
+
   // Predefined Locations state
   const [locations, setLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
@@ -551,6 +578,90 @@ export default function App() {
     } catch (err) {
       triggerAlert('error', err.message || 'Failed to approve cancellation.');
     }
+  };
+
+  
+  // Ride Reschedule & Cancel Handlers
+  const handleRescheduleRideSubmit = async (e) => {
+    e.preventDefault();
+    if (!rescheduleRide || !rescheduleDateTime) return;
+    setProcessingRideAction(true);
+    try {
+      const newDate = new Date(rescheduleDateTime);
+      await api.adminRescheduleRide(rescheduleRide.id, newDate.toISOString());
+      setRides(prev => prev.map(r => r.id === rescheduleRide.id ? { ...r, departureAt: newDate.toISOString() } : r));
+      if (selectedRideDetails && selectedRideDetails.id === rescheduleRide.id) {
+        setSelectedRideDetails(prev => ({ ...prev, departureAt: newDate.toISOString() }));
+      }
+      triggerAlert('success', `Ride ${rescheduleRide.id} rescheduled successfully to ${newDate.toLocaleString()}.`);
+      setShowRescheduleModal(false);
+      setRescheduleRide(null);
+    } catch (err) {
+      triggerAlert('error', err.message || 'Failed to reschedule ride.');
+    }
+    setProcessingRideAction(false);
+  };
+
+  const handleCancelRideSubmit = async (e) => {
+    e.preventDefault();
+    if (!cancelRideTarget) return;
+    setProcessingRideAction(true);
+    try {
+      await api.adminCancelRide(cancelRideTarget.id, cancelRideReason);
+      setRides(prev => prev.map(r => r.id === cancelRideTarget.id ? { ...r, status: 'CANCELLED', cancellationReason: cancelRideReason, cancelledAt: new Date().toISOString() } : r));
+      if (selectedRideDetails && selectedRideDetails.id === cancelRideTarget.id) {
+        setSelectedRideDetails(prev => ({ ...prev, status: 'CANCELLED', cancellationReason: cancelRideReason, cancelledAt: new Date().toISOString() }));
+      }
+      triggerAlert('success', `Ride ${cancelRideTarget.id} cancelled. Active bookings refunded.`);
+      setShowCancelRideModal(false);
+      setCancelRideTarget(null);
+    } catch (err) {
+      triggerAlert('error', err.message || 'Failed to cancel ride.');
+    }
+    setProcessingRideAction(false);
+  };
+
+  // Package Booking Edit Handler
+  const handleUpdatePackageBookingSubmit = async (e) => {
+    e.preventDefault();
+    if (!editPackageBooking) return;
+    setSavingPackageEdit(true);
+    try {
+      const dests = editDestinations ? editDestinations.split(',').map(d => d.trim()).filter(Boolean) : [];
+      await api.adminUpdatePackageBooking(editPackageBooking.id, {
+        travelDate: editTravelDate ? new Date(editTravelDate).toISOString() : undefined,
+        pickupPoint: editPickupPoint,
+        destinations: dests.length > 0 ? dests : undefined,
+        notes: editNotes
+      });
+      setPackageBookings(prev => prev.map(b => {
+        if (b.id === editPackageBooking.id) {
+          return {
+            ...b,
+            travelDate: editTravelDate ? new Date(editTravelDate).toISOString() : b.travelDate,
+            pickupPoint: editPickupPoint,
+            destinations: dests.length > 0 ? dests : b.destinations,
+            notes: editNotes
+          };
+        }
+        return b;
+      }));
+      if (selectedPackageDetails && selectedPackageDetails.id === editPackageBooking.id) {
+        setSelectedPackageDetails(prev => ({
+          ...prev,
+          travelDate: editTravelDate ? new Date(editTravelDate).toISOString() : prev.travelDate,
+          pickupPoint: editPickupPoint,
+          destinations: dests.length > 0 ? dests : prev.destinations,
+          notes: editNotes
+        }));
+      }
+      triggerAlert('success', `Package booking ${editPackageBooking.id} updated successfully.`);
+      setShowEditPackageModal(false);
+      setEditPackageBooking(null);
+    } catch (err) {
+      triggerAlert('error', err.message || 'Failed to update package booking.');
+    }
+    setSavingPackageEdit(false);
   };
 
   const handleRejectCancellation = async (rideId) => {
@@ -1228,14 +1339,24 @@ export default function App() {
                               )}
                             </td>
                             <td>
-                              <button 
-                                onClick={() => handleToggleUserStatus(user.id || user._id, user.accountStatus)}
-                                className={`btn ${user.accountStatus === 'ACTIVE' ? 'btn-danger' : 'btn-primary'}`}
-                                style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}
-                              >
-                                {user.accountStatus === 'ACTIVE' ? 'Suspend' : 'Activate'}
-                              </button>
-                            </td>
+                                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                  <button 
+                                    onClick={() => { setSelectedUserProfile(user); setShowUserProfileModal(true); }}
+                                    className="btn btn-outline"
+                                    style={{ fontSize: '0.75rem', padding: '0.4rem 0.75rem', whiteSpace: 'nowrap' }}
+                                    title="View Complete Profile & KYC"
+                                  >
+                                    View Profile
+                                  </button>
+                                  <button 
+                                    onClick={() => handleToggleUserStatus(user.id || user._id, user.accountStatus)}
+                                    className={`btn ${user.accountStatus === 'ACTIVE' ? 'btn-danger' : 'btn-primary'}`}
+                                    style={{ fontSize: '0.75rem', padding: '0.4rem 0.75rem', whiteSpace: 'nowrap' }}
+                                  >
+                                    {user.accountStatus === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                                  </button>
+                                </div>
+                              </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1581,27 +1702,56 @@ export default function App() {
                               </span>
                             </td>
                             <td>
-                              {ride.status === 'CANCELLATION_REQUESTED' ? (
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
                                   <button
-                                    onClick={() => handleApproveCancellation(ride.id)}
-                                    className="btn btn-danger"
-                                    style={{ fontSize: '0.75rem', padding: '0.4rem 0.75rem' }}
-                                  >
-                                    Approve Cancel
-                                  </button>
-                                  <button
-                                    onClick={() => handleRejectCancellation(ride.id)}
+                                    onClick={() => { setSelectedRideDetails(ride); setShowRideDetailsModal(true); }}
                                     className="btn btn-outline"
-                                    style={{ fontSize: '0.75rem', padding: '0.4rem 0.75rem' }}
+                                    style={{ fontSize: '0.72rem', padding: '0.35rem 0.65rem', whiteSpace: 'nowrap' }}
+                                    title="View Full Ride Details"
                                   >
-                                    Reject Cancel
+                                    Details
                                   </button>
+                                  {ride.status !== 'CANCELLED' && ride.status !== 'COMPLETED' && (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          setRescheduleRide(ride);
+                                          const d = new Date(ride.departureAt);
+                                          const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                                          setRescheduleDateTime(localIso);
+                                          setShowRescheduleModal(true);
+                                        }}
+                                        className="btn btn-outline"
+                                        style={{ fontSize: '0.72rem', padding: '0.35rem 0.65rem', whiteSpace: 'nowrap' }}
+                                        title="Change Departure Date & Time"
+                                      >
+                                        Reschedule
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setCancelRideTarget(ride);
+                                          setCancelRideReason('Admin cancellation: Schedule conflict or operational requirement');
+                                          setShowCancelRideModal(true);
+                                        }}
+                                        className="btn btn-danger"
+                                        style={{ fontSize: '0.72rem', padding: '0.35rem 0.65rem', whiteSpace: 'nowrap' }}
+                                        title="Cancel Ride & Refund Passengers"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  )}
+                                  {ride.status === 'CANCELLATION_REQUESTED' && (
+                                    <button
+                                      onClick={() => handleApproveCancellation(ride.id)}
+                                      className="btn btn-danger"
+                                      style={{ fontSize: '0.72rem', padding: '0.35rem 0.65rem', whiteSpace: 'nowrap' }}
+                                    >
+                                      Approve Cancel
+                                    </button>
+                                  )}
                                 </div>
-                              ) : (
-                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
-                              )}
-                            </td>
+                              </td>
                           </tr>
                         ))}
                       </tbody>
@@ -2027,18 +2177,42 @@ export default function App() {
                                 )}
                               </td>
                               <td>
-                                {(booking.status === 'CANCELLED' || booking.status === 'COMPLETED') ? (
-                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
-                                ) : (
-                                  <button
-                                    onClick={() => handleOpenAllocateModal(booking)}
-                                    className={booking.isDriverAllocated || booking.status === 'ALLOCATED' || booking.status === 'TRAVEL_START' ? "btn btn-outline" : "btn btn-primary"}
-                                    style={{ fontSize: '0.74rem', padding: '0.35rem 0.75rem' }}
-                                  >
-                                    {booking.isDriverAllocated || booking.status === 'ALLOCATED' || booking.status === 'TRAVEL_START' ? "Reallocate" : "Allocate"}
-                                  </button>
-                                )}
-                              </td>
+                                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <button
+                                      onClick={() => { setSelectedPackageDetails(booking); setShowPackageDetailsModal(true); }}
+                                      className="btn btn-outline"
+                                      style={{ fontSize: '0.72rem', padding: '0.35rem 0.65rem', whiteSpace: 'nowrap' }}
+                                      title="View Full Booking Details"
+                                    >
+                                      Details
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditPackageBooking(booking);
+                                        const td = booking.travelDate ? new Date(booking.travelDate).toISOString().slice(0, 10) : '';
+                                        setEditTravelDate(td);
+                                        setEditPickupPoint(booking.pickupPoint || 'DEHRADUN');
+                                        setEditDestinations(Array.isArray(booking.destinations) ? booking.destinations.join(', ') : (booking.destinations || ''));
+                                        setEditNotes(booking.notes || '');
+                                        setShowEditPackageModal(true);
+                                      }}
+                                      className="btn btn-outline"
+                                      style={{ fontSize: '0.72rem', padding: '0.35rem 0.65rem', whiteSpace: 'nowrap' }}
+                                      title="Change Travel Date, Pickup & Destinations"
+                                    >
+                                      Edit
+                                    </button>
+                                    {booking.status !== 'CANCELLED' && booking.status !== 'COMPLETED' && (
+                                      <button
+                                        onClick={() => handleOpenAllocateModal(booking)}
+                                        className={booking.isDriverAllocated || booking.status === 'ALLOCATED' || booking.status === 'TRAVEL_START' ? "btn btn-outline" : "btn btn-primary"}
+                                        style={{ fontSize: '0.72rem', padding: '0.35rem 0.65rem', whiteSpace: 'nowrap' }}
+                                      >
+                                        {booking.isDriverAllocated || booking.status === 'ALLOCATED' || booking.status === 'TRAVEL_START' ? "Reallocate" : "Allocate"}
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
                             </tr>
                           ))}
                       </tbody>

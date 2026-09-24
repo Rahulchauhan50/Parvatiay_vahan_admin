@@ -135,6 +135,7 @@ export default function App() {
   // --- COMPLETE PROFILE PAGE HANDLERS ---
   const handleOpenUserProfile = async (user) => {
     setViewingUserProfile(user);
+    setSelectedUserProfile(user);
     setLoadingUserProfile(true);
     try {
       const data = await api.getAdminUserDetail(user.id || user._id);
@@ -1376,7 +1377,444 @@ export default function App() {
           )}
 
           {/* USERS TAB */}
-          {currentTab === 'users' && (
+          {currentTab === 'users' && viewingUserProfile ? (
+            /* COMPLETE PROFILE & KYC PAGE */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Top Action Bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => setViewingUserProfile(null)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}
+                >
+                  ← Back to Users List
+                </button>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => handleOpenUserProfile(viewingUserProfile)}
+                    disabled={loadingUserProfile}
+                    title="Reload latest user data from server"
+                  >
+                    🔄 {loadingUserProfile ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                  <button
+                    className={`btn ${viewingUserProfile.accountStatus === 'ACTIVE' ? 'btn-danger' : 'btn-primary'}`}
+                    onClick={() => handleToggleUserStatus(viewingUserProfile.id || viewingUserProfile._id, viewingUserProfile.accountStatus)}
+                  >
+                    {viewingUserProfile.accountStatus === 'ACTIVE' ? '🚫 Suspend User' : '✅ Activate User'}
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => handleOpenEditProfileModal(viewingUserProfile)}
+                    style={{ fontWeight: 700 }}
+                  >
+                    ✏️ Edit Profile & KYC Details
+                  </button>
+                </div>
+              </div>
+
+              {/* Profile Hero Header Card */}
+              <div className="card" style={{
+                background: 'linear-gradient(135deg, var(--card-bg) 0%, rgba(249, 115, 22, 0.05) 100%)',
+                borderLeft: '5px solid var(--primary)',
+                padding: '1.75rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                  <img
+                    src={resolveImageUrl(viewingUserProfile.profilePhotoUrl) || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120"}
+                    alt={viewingUserProfile.name || 'User'}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    style={{
+                      width: '75px',
+                      height: '75px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '3px solid var(--primary)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}
+                  />
+                  <div style={{ flex: 1, minWidth: '240px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                      <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800 }}>{viewingUserProfile.name || 'Unnamed User'}</h2>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        {(viewingUserProfile.roles || ['PASSENGER']).map(r => (
+                          <span key={r} className={`badge ${r === 'ADMIN' ? 'badge-info' : r === 'DRIVER' ? 'badge-warning' : 'badge-success'}`}>
+                            {r}
+                          </span>
+                        ))}
+                        <span className={`badge ${viewingUserProfile.accountStatus === 'ACTIVE' ? 'badge-success' : 'badge-error'}`}>
+                          {viewingUserProfile.accountStatus || 'ACTIVE'}
+                        </span>
+                        {viewingUserProfile.driverStatus && viewingUserProfile.driverStatus !== 'NOT_APPLIED' && (
+                          <span className={`badge ${viewingUserProfile.driverStatus === 'APPROVED' ? 'badge-success' : viewingUserProfile.driverStatus === 'IN_REVIEW' ? 'badge-warning' : 'badge-info'}`}>
+                            Driver: {viewingUserProfile.driverStatus.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                        <span className={`badge ${viewingUserProfile.driverKyc?.isVerified ? 'badge-success' : viewingUserProfile.driverKyc?.status === 'PARTIAL' ? 'badge-warning' : 'badge-info'}`}>
+                          KYC: {viewingUserProfile.driverKyc?.isVerified ? 'VERIFIED' : viewingUserProfile.driverKyc?.status || 'PENDING'}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                      <span>📱 <strong>{viewingUserProfile.mobile || '—'}</strong></span>
+                      <span>✉️ <strong>{viewingUserProfile.email || 'No email registered'}</strong></span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        🔑 ID: <code style={{ fontFamily: 'monospace', color: 'var(--text-main)', fontSize: '0.82rem' }}>{viewingUserProfile.id || viewingUserProfile._id}</code>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(viewingUserProfile.id || viewingUserProfile._id);
+                            setCopiedId(viewingUserProfile.id || viewingUserProfile._id);
+                            setTimeout(() => setCopiedId(''), 1500);
+                          }}
+                          className="btn btn-outline"
+                          style={{ padding: '0.1rem 0.35rem', fontSize: '0.65rem' }}
+                        >
+                          {copiedId === (viewingUserProfile.id || viewingUserProfile._id) ? 'Copied!' : 'Copy'}
+                        </button>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* KYC 3-Pillar Verification Grid (Aadhaar, PAN, Bank) */}
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  🛡️ Document & Account KYC Verifications
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
+                  
+                  {/* AADHAAR CARD VERIFICATION */}
+                  {(() => {
+                    const aadhaar = viewingUserProfile.driverKyc?.aadhaar || {};
+                    const isVer = !!aadhaar.verified;
+                    return (
+                      <div className="card" style={{
+                        borderTop: isVer ? '4px solid var(--success)' : '4px solid var(--warning)',
+                        position: 'relative'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <span style={{ fontSize: '1.5rem' }}>🪪</span>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Aadhaar Card</h4>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>UIDAI Identity Verification</span>
+                            </div>
+                          </div>
+                          <span className={`badge ${isVer ? 'badge-success' : 'badge-warning'}`} style={{ fontWeight: 700 }}>
+                            {isVer ? '✅ Verified' : '⚠️ Not Verified'}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.85rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Aadhaar Number:</span>
+                            <strong style={{ fontFamily: 'monospace' }}>{aadhaar.aadhaarNumberMasked || 'Not provided'}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Name on Aadhaar:</span>
+                            <strong>{aadhaar.name || viewingUserProfile.name || '—'}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Reference ID:</span>
+                            <span style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{aadhaar.refId || '—'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Verified At:</span>
+                            <span>{aadhaar.verifiedAt ? new Date(aadhaar.verifiedAt).toLocaleString() : 'Pending'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* PAN CARD VERIFICATION */}
+                  {(() => {
+                    const pan = viewingUserProfile.driverKyc?.pan || {};
+                    const isVer = !!pan.verified;
+                    return (
+                      <div className="card" style={{
+                        borderTop: isVer ? '4px solid var(--success)' : '4px solid var(--warning)',
+                        position: 'relative'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <span style={{ fontSize: '1.5rem' }}>📄</span>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>PAN Card</h4>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Income Tax Dept Verification</span>
+                            </div>
+                          </div>
+                          <span className={`badge ${isVer ? 'badge-success' : 'badge-warning'}`} style={{ fontWeight: 700 }}>
+                            {isVer ? '✅ Verified' : '⚠️ Not Verified'}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.85rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>PAN Number:</span>
+                            <strong style={{ fontFamily: 'monospace', letterSpacing: '0.5px' }}>{pan.panNumber || 'Not provided'}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Registered Name:</span>
+                            <strong>{pan.registeredName || viewingUserProfile.name || '—'}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Verified At:</span>
+                            <span>{pan.verifiedAt ? new Date(pan.verifiedAt).toLocaleString() : 'Pending'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* BANK ACCOUNT & PAYOUT VERIFICATION */}
+                  {(() => {
+                    const bank = viewingUserProfile.driverKyc?.bank || {};
+                    const acc = viewingUserProfile.accountInfo || {};
+                    const isVer = !!bank.verified;
+                    return (
+                      <div className="card" style={{
+                        borderTop: isVer ? '4px solid var(--success)' : '4px solid var(--warning)',
+                        position: 'relative'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <span style={{ fontSize: '1.5rem' }}>🏦</span>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Bank Account</h4>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Penny-Drop Account Verification</span>
+                            </div>
+                          </div>
+                          <span className={`badge ${isVer ? 'badge-success' : 'badge-warning'}`} style={{ fontWeight: 700 }}>
+                            {isVer ? '✅ Verified' : '⚠️ Not Verified'}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.85rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Account Number:</span>
+                            <strong style={{ fontFamily: 'monospace' }}>{bank.accountNumberMasked || acc.accountNumber || 'Not provided'}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>IFSC Code:</span>
+                            <strong style={{ fontFamily: 'monospace' }}>{bank.ifscCode || acc.ifscCode || '—'}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Bank Name:</span>
+                            <strong>{bank.bankName || acc.branchName || '—'}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Name at Bank:</span>
+                            <strong>{bank.nameAtBank || acc.accountHolderName || '—'}</strong>
+                          </div>
+                          {viewingUserProfile.upiId && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border)' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>UPI ID:</span>
+                              <strong style={{ color: 'var(--primary)' }}>{viewingUserProfile.upiId}</strong>
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Verified At:</span>
+                            <span>{bank.verifiedAt ? new Date(bank.verifiedAt).toLocaleString() : 'Pending'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                </div>
+              </div>
+
+              {/* 2-Column Details Layout */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '1.5rem' }}>
+                
+                {/* Left Column: Personal, Capabilities & Vehicle */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Personal & Account Info */}
+                  <div className="card">
+                    <h4 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '1rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      👤 Personal & Account Information
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.85rem', fontSize: '0.85rem' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Full Name</span>
+                        <strong>{viewingUserProfile.name || '—'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Mobile</span>
+                        <strong>{viewingUserProfile.mobile || '—'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Email Address</span>
+                        <strong>{viewingUserProfile.email || 'Not provided'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Gender</span>
+                        <strong>{viewingUserProfile.gender || 'Not specified'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Account Status</span>
+                        <span className={`badge ${viewingUserProfile.accountStatus === 'ACTIVE' ? 'badge-success' : 'badge-error'}`}>
+                          {viewingUserProfile.accountStatus || 'ACTIVE'}
+                        </span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Profile Completed</span>
+                        <span>{viewingUserProfile.profileCompleted ? '✅ Yes' : '❌ No'}</span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Registered On</span>
+                        <span>{viewingUserProfile.createdAt ? new Date(viewingUserProfile.createdAt).toLocaleDateString() : '—'}</span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Last Updated</span>
+                        <span>{viewingUserProfile.updatedAt ? new Date(viewingUserProfile.updatedAt).toLocaleDateString() : '—'}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+                        System Capabilities
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        <span className={`badge ${viewingUserProfile.capabilities?.canBookRide ? 'badge-success' : 'badge-info'}`}>
+                          {viewingUserProfile.capabilities?.canBookRide ? '✓ Can Book Ride' : '✗ Cannot Book Ride'}
+                        </span>
+                        <span className={`badge ${viewingUserProfile.capabilities?.canOfferRide ? 'badge-success' : 'badge-info'}`}>
+                          {viewingUserProfile.capabilities?.canOfferRide ? '✓ Can Offer Ride' : '✗ Cannot Offer Ride'}
+                        </span>
+                        <span className={`badge ${viewingUserProfile.capabilities?.canManageRequests ? 'badge-success' : 'badge-info'}`}>
+                          {viewingUserProfile.capabilities?.canManageRequests ? '✓ Can Manage Requests' : '✗ Cannot Manage Requests'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Vehicle Details */}
+                  {viewingUserProfile.vehicle && (
+                    <div className="card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          🚗 Registered Vehicle
+                        </h4>
+                        <span className="badge badge-success">Active Vehicle</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.85rem', fontSize: '0.85rem' }}>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Make & Model</span>
+                          <strong style={{ fontSize: '1rem' }}>{viewingUserProfile.vehicle.make} {viewingUserProfile.vehicle.model}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Registration Number</span>
+                          <strong style={{ fontFamily: 'monospace', fontSize: '1rem', color: 'var(--primary)' }}>
+                            {viewingUserProfile.vehicle.registrationNumber}
+                          </strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Color</span>
+                          <strong>{viewingUserProfile.vehicle.color || 'White'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Passenger Capacity</span>
+                          <strong>{viewingUserProfile.vehicle.seatCapacity || 4} Seats</strong>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: Uploaded Documents */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div className="card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        📑 Uploaded Driver Documents
+                      </h4>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        {viewingUserProfile.documents?.length || 0} Files
+                      </span>
+                    </div>
+
+                    {loadingUserProfile ? (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading documents...</div>
+                    ) : (viewingUserProfile.documents && viewingUserProfile.documents.length > 0) ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {viewingUserProfile.documents.map((doc) => (
+                          <div
+                            key={doc.id}
+                            style={{
+                              padding: '0.85rem 1rem',
+                              backgroundColor: 'var(--bg-main)',
+                              borderRadius: 'var(--radius-sm)',
+                              border: '1px solid var(--border)',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '1rem',
+                              flexWrap: 'wrap'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                              <span style={{ fontSize: '1.4rem' }}>
+                                {doc.documentType?.includes('LICENSE') ? '🪪' : doc.documentType?.includes('RC') ? '🚗' : doc.documentType?.includes('INSURANCE') ? '📄' : '📁'}
+                              </span>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                                  {doc.documentType?.replace(/_/g, ' ')}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  Submitted: {doc.submittedAt ? new Date(doc.submittedAt).toLocaleDateString() : '—'}
+                                  {doc.originalFileName && ` • ${doc.originalFileName}`}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span className={`badge ${doc.status === 'VERIFIED' ? 'badge-success' : doc.status === 'REJECTED' ? 'badge-error' : 'badge-warning'}`}>
+                                {doc.status?.replace(/_/g, ' ')}
+                              </span>
+                              {doc.uploadUrl && (
+                                <button
+                                  className="btn btn-outline"
+                                  onClick={() => setPreviewDocModal({
+                                    url: resolveImageUrl(doc.uploadUrl),
+                                    title: doc.documentType?.replace(/_/g, ' ') || 'Document Preview',
+                                    mimeType: doc.mimeType,
+                                  })}
+                                  style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                                >
+                                  👁️ View
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{
+                        padding: '2.5rem 1.5rem',
+                        textAlign: 'center',
+                        color: 'var(--text-muted)',
+                        backgroundColor: 'var(--bg-main)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px dashed var(--border)'
+                      }}>
+                        <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📂</div>
+                        <div style={{ fontWeight: 600 }}>No document uploads on file for this user.</div>
+                        <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                          If this user is a passenger, driver documents are not mandatory.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          ) : currentTab === 'users' && (
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <h3>Users Database</h3>

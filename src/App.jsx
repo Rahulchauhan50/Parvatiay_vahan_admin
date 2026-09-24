@@ -99,6 +99,16 @@ export default function App() {
   const [packageBookingLimit, setPackageBookingLimit] = useState(10);
   const [copiedId, setCopiedId] = useState('');
 
+  // --- POLICIES & CMS STATE ---
+  const [policiesList, setPoliciesList] = useState([]);
+  const [loadingPolicies, setLoadingPolicies] = useState(false);
+  const [activePolicySlug, setActivePolicySlug] = useState('terms-conditions');
+  const [policyTitle, setPolicyTitle] = useState('');
+  const [policyContent, setPolicyContent] = useState('');
+  const [policyLastUpdated, setPolicyLastUpdated] = useState('');
+  const [savingPolicy, setSavingPolicy] = useState(false);
+
+
   // --- USER COMPLETE PROFILE PAGE & EDIT STATE ---
   const [selectedUserProfile, setSelectedUserProfile] = useState(null);
   const [showUserProfileModal, setShowUserProfileModal] = useState(false);
@@ -518,6 +528,13 @@ export default function App() {
         ]);
         setPackageBookings(bookingsData.bookings || []);
         setUsers(usersData.users || []);
+      } else if (currentTab === 'policies') {
+        setLoadingPolicies(true);
+        const data = await api.listAdminPolicies();
+        const list = Array.isArray(data) ? data : (data.policies || []);
+        setPoliciesList(list);
+        handleSelectPolicySlug(activePolicySlug, list);
+        setLoadingPolicies(false);
       } else if (currentTab === 'locations') {
         setLoadingLocations(true);
         const data = await api.listAdminLocations();
@@ -813,6 +830,48 @@ export default function App() {
       triggerAlert('error', err.message || 'Failed to update package booking.');
     }
     setSavingPackageEdit(false);
+  };
+
+  
+  // Policy Select & Save Handlers
+  const handleSelectPolicySlug = (slug, list = policiesList) => {
+    setActivePolicySlug(slug);
+    const item = list.find(p => p.slug === slug);
+    if (item) {
+      setPolicyTitle(item.title || '');
+      setPolicyContent(item.content || '');
+      setPolicyLastUpdated(item.lastUpdated ? new Date(item.lastUpdated).toLocaleString() : '');
+    } else {
+      setPolicyTitle('');
+      setPolicyContent('');
+      setPolicyLastUpdated('');
+    }
+  };
+
+  const handleSavePolicy = async (e) => {
+    e?.preventDefault();
+    if (!activePolicySlug || !policyContent.trim()) {
+      triggerAlert('error', 'Policy content cannot be empty.');
+      return;
+    }
+    setSavingPolicy(true);
+    try {
+      const res = await api.updateAdminPolicy(activePolicySlug, {
+        title: policyTitle.trim(),
+        content: policyContent
+      });
+      triggerAlert('success', `${policyTitle || activePolicySlug} saved successfully in database.`);
+      setPolicyLastUpdated(new Date().toLocaleString());
+      setPoliciesList(prev => prev.map(p => p.slug === activePolicySlug ? {
+        ...p,
+        title: policyTitle.trim(),
+        content: policyContent,
+        lastUpdated: new Date()
+      } : p));
+    } catch (err) {
+      triggerAlert('error', err.message || 'Failed to save policy.');
+    }
+    setSavingPolicy(false);
   };
 
   const handleRejectCancellation = async (rideId) => {
@@ -2817,6 +2876,122 @@ export default function App() {
                     false
                   )}
                 </>
+              )}
+            </div>
+          )}
+
+          
+          {/* LEGAL & POLICIES CMS TAB */}
+          {currentTab === 'policies' && (
+            <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1.25rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>Legal Policies & Content Management</h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+                    Edit legal documents displayed in the user & driver mobile applications (Terms & Conditions, Refunds & Cancellations, Privacy Policy). Content is saved directly in MongoDB.
+                  </p>
+                </div>
+                {policyLastUpdated && (
+                  <span className="badge badge-info" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}>
+                    Last Updated: {policyLastUpdated}
+                  </span>
+                )}
+              </div>
+
+              {/* Policy Selector Pills */}
+              <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPolicySlug('terms-conditions')}
+                  className={`btn ${activePolicySlug === 'terms-conditions' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ fontSize: '0.88rem', padding: '0.55rem 1.1rem' }}
+                >
+                  📄 Terms & Conditions
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPolicySlug('refund-policy')}
+                  className={`btn ${activePolicySlug === 'refund-policy' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ fontSize: '0.88rem', padding: '0.55rem 1.1rem' }}
+                >
+                  💳 Refunds & Cancellations
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPolicySlug('privacy-policy')}
+                  className={`btn ${activePolicySlug === 'privacy-policy' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ fontSize: '0.88rem', padding: '0.55rem 1.1rem' }}
+                >
+                  🔒 Privacy Policy
+                </button>
+              </div>
+
+              {loadingPolicies ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  Loading policy content from database...
+                </div>
+              ) : (
+                <form onSubmit={handleSavePolicy}>
+                  <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                      Document Display Title
+                    </label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      value={policyTitle}
+                      onChange={(e) => setPolicyTitle(e.target.value)}
+                      placeholder="e.g. Terms & Conditions — PAVAN"
+                      required
+                      style={{ fontSize: '1rem', fontWeight: 600 }}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>
+                        Policy Text & Markdown Content
+                      </label>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Supports Markdown headings (#, ##, ###), bold (**text**), and bullet points (- item)
+                      </span>
+                    </div>
+                    <textarea 
+                      className="form-control" 
+                      rows="20"
+                      value={policyContent}
+                      onChange={(e) => setPolicyContent(e.target.value)}
+                      placeholder="Write your policy text here..."
+                      required
+                      style={{ 
+                        fontFamily: 'Consolas, Monaco, "Courier New", monospace', 
+                        fontSize: '0.88rem', 
+                        lineHeight: '1.6',
+                        padding: '1rem',
+                        backgroundColor: 'var(--bg-main)'
+                      }}
+                    ></textarea>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPolicySlug(activePolicySlug)}
+                      className="btn btn-outline"
+                      disabled={savingPolicy}
+                    >
+                      Discard Unsaved Changes
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary"
+                      disabled={savingPolicy}
+                      style={{ minWidth: '180px', padding: '0.65rem 1.5rem', fontWeight: 700, fontSize: '0.95rem' }}
+                    >
+                      {savingPolicy ? 'Saving to DB...' : '💾 Save Content to Database'}
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           )}

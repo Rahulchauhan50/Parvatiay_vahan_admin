@@ -364,6 +364,38 @@ export const updateAdminUser = async (userId, userData) => {
   return data.data || data;
 };
 
+
+// Legal & Policy Management APIs
+export const getPolicy = async (slug) => {
+  const res = await fetch(`${BASE_URL}/content/${slug}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to fetch policy');
+  return data.data || data;
+};
+
+export const listAdminPolicies = async () => {
+  const res = await fetch(`${BASE_URL}/admin/content`, {
+    headers: { Authorization: `Bearer ${getToken()}` }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to fetch policies');
+  return data.data?.policies || data.policies || data;
+};
+
+export const updateAdminPolicy = async (slug, updateData) => {
+  const res = await fetch(`${BASE_URL}/admin/content/${slug}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify(updateData)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to update policy');
+  return data.data || data;
+};
+
 // Stub functions so App.jsx doesn't break if it references old exports
 export const getMockMode = () => false;
 export const setMockMode = () => {};

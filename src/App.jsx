@@ -1444,6 +1444,15 @@ export default function App() {
             Locations
           </button>
           <button 
+            className={`menu-item ${currentTab === 'insurance' ? 'active' : ''}`}
+            onClick={() => navigateToTab('insurance')}
+          >
+            <svg className="menu-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            Insurances
+          </button>
+          <button 
             className={`menu-item ${currentTab === 'policies' ? 'active' : ''}`}
             onClick={() => navigateToTab('policies')}
           >
@@ -1470,7 +1479,7 @@ export default function App() {
       <main className="main-content">
         <header className="header">
           <div className="header-title">
-            <h2 style={{ fontFamily: 'var(--font-heading)' }}>{currentTab.charAt(0).toUpperCase() + currentTab.slice(1).replace('-', ' ')}</h2>
+            <h2 style={{ fontFamily: 'var(--font-heading)' }}>{currentTab === 'insurance' ? 'Driver Insurances Registry' : currentTab === 'policies' ? 'Legal Policies' : currentTab.charAt(0).toUpperCase() + currentTab.slice(1).replace('-', ' ')}</h2>
           </div>
         <div className="header-actions">
             {backendOnline ? (
@@ -3045,6 +3054,16 @@ export default function App() {
                                         {booking.isDriverAllocated || booking.status === 'ALLOCATED' || booking.status === 'TRAVEL_START' ? "Reallocate" : "Allocate"}
                                       </button>
                                     )}
+                                     {booking.status !== 'CANCELLED' && booking.status !== 'COMPLETED' && (
+                                       <button
+                                         onClick={() => handleOpenCancelPackageModal(booking)}
+                                         className="btn btn-outline"
+                                         style={{ fontSize: '0.72rem', padding: '0.35rem 0.65rem', whiteSpace: 'nowrap', color: 'var(--error)', borderColor: 'var(--error)' }}
+                                         title="Cancel this Package Booking"
+                                       >
+                                         Cancel
+                                       </button>
+                                     )}
                                   </div>
                                 </td>
                             </tr>
@@ -4150,7 +4169,22 @@ export default function App() {
               </div>
             )}
 
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                {selectedPackageDetails.status !== 'CANCELLED' && selectedPackageDetails.status !== 'COMPLETED' && (
+                  <button 
+                    type="button" 
+                    className="btn btn-danger"
+                    style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+                    onClick={() => {
+                      setShowPackageDetailsModal(false);
+                      handleOpenCancelPackageModal(selectedPackageDetails);
+                    }}
+                  >
+                    Cancel Booking
+                  </button>
+                )}
+              </div>
               <button type="button" className="btn btn-outline" onClick={() => setShowPackageDetailsModal(false)}>
                 Close
               </button>

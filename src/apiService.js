@@ -400,3 +400,28 @@ export const updateAdminPolicy = async (slug, updateData) => {
 export const getMockMode = () => false;
 export const setMockMode = () => {};
 
+
+// Driver Insurances
+export const listDriverInsurances = async () => {
+  const res = await fetch(`${BASE_URL}/admin/driver-insurances`, {
+    headers: { Authorization: `Bearer ${getToken()}` }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to fetch driver insurances');
+  return data.data || [];
+};
+
+// Cancel Package Booking
+export const adminCancelPackageBooking = async (bookingId, reason) => {
+  const res = await fetch(`${BASE_URL}/admin/package-bookings/${bookingId}/cancel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify({ reason })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to cancel package booking');
+  return data.data || data;
+};

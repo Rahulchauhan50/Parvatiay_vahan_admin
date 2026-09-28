@@ -133,6 +133,14 @@ export default function App() {
 
   // --- PACKAGE BOOKING DETAILS & EDIT STATE ---
   const [selectedPackageDetails, setSelectedPackageDetails] = useState(null);
+  const [driverInsurances, setDriverInsurances] = useState([]);
+  const [loadingInsurances, setLoadingInsurances] = useState(false);
+  const [insuranceFilter, setInsuranceFilter] = useState('ALL');
+  const [insuranceSearch, setInsuranceSearch] = useState('');
+  const [showCancelPackageModal, setShowCancelPackageModal] = useState(false);
+  const [cancellingPackageBooking, setCancellingPackageBooking] = useState(null);
+  const [cancelPackageReason, setCancelPackageReason] = useState('');
+  const [cancellingPackageLoading, setCancellingPackageLoading] = useState(false);
   const [showPackageDetailsModal, setShowPackageDetailsModal] = useState(false);
   const [editPackageBooking, setEditPackageBooking] = useState(null);
   const [showEditPackageModal, setShowEditPackageModal] = useState(false);
@@ -211,6 +219,7 @@ export default function App() {
       vehicleColor: vehicle.color || '',
       vehicleReg: vehicle.registrationNumber || '',
       vehicleSeats: vehicle.seatCapacity || 4,
+      insuranceExpiryDate: vehicle.insuranceExpiryDate ? new Date(vehicle.insuranceExpiryDate).toISOString().split('T')[0] : '',
     });
     setShowEditProfileModal(true);
   };
@@ -265,6 +274,7 @@ export default function App() {
           color: editProfileForm.vehicleColor,
           registrationNumber: editProfileForm.vehicleReg,
           seatCapacity: Number(editProfileForm.vehicleSeats) || 4,
+          insuranceExpiryDate: editProfileForm.insuranceExpiryDate || undefined,
         },
       };
 
@@ -529,6 +539,16 @@ export default function App() {
         ]);
         setPackageBookings(bookingsData.bookings || []);
         setUsers(usersData.users || []);
+      } else if (currentTab === 'insurance') {
+        setLoadingInsurances(true);
+        try {
+          const insData = await api.listDriverInsurances();
+          setDriverInsurances(insData);
+        } catch (err) {
+          triggerAlert('error', err.message || 'Failed to load driver insurances');
+        } finally {
+          setLoadingInsurances(false);
+        }
       } else if (currentTab === 'policies') {
         setLoadingPolicies(true);
         const data = await api.listAdminPolicies();
@@ -891,6 +911,159 @@ export default function App() {
       triggerAlert('success', 'Ride cancellation rejected. Ride is active again.');
     } catch (err) {
       triggerAlert('error', err.message || 'Failed to reject cancellation.');
+    }
+  };
+
+  const handleOpenCancelPackageModal = (booking) => {
+    setCancellingPackageBooking(booking);
+    setCancelPackageReason('');
+    setShowCancelPackageModal(true);
+  };
+
+  
+  const handleDownloadInsurancePDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      triggerAlert('error', 'Popup blocked. Please allow popups to download PDF.');
+      return;
+    }
+
+    const filtered = driverInsurances.filter(d => {
+      const matchSearch = !insuranceSearch || 
+        d.driverName.toLowerCase().includes(insuranceSearch.toLowerCase()) ||
+        d.driverMobile.includes(insuranceSearch) ||
+        d.registrationNumber.toLowerCase().includes(insuranceSearch.toLowerCase());
+      if (!matchSearch) return false;
+      if (insuranceFilter === 'ALL') return true;
+      return d.status === insuranceFilter;
+    });
+
+    const validCount = driverInsurances.filter(d => d.status === 'VALID').length;
+    const expiringCount = driverInsurances.filter(d => d.status === 'EXPIRING_SOON').length;
+    const expiredCount = driverInsurances.filter(d => d.status === 'EXPIRED').length;
+    const missingCount = driverInsurances.filter(d => d.status === 'MISSING').length;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>PAVAN - Driver Vehicle Insurance Registry Report</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 25px; color: #1e293b; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #f97316; padding-bottom: 15px; margin-bottom: 20px; }
+          .logo { font-size: 24px; font-weight: 800; color: #f97316; }
+          .subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
+          .meta { text-align: right; font-size: 12px; color: #64748b; }
+          .metrics { display: flex; gap: 15px; margin-bottom: 25px; }
+          .metric-card { flex: 1; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+          .metric-val { font-size: 20px; font-weight: 700; color: #0f172a; margin-top: 4px; }
+          .metric-lbl { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+          th { background: #f1f5f9; color: #334155; font-weight: 700; text-align: left; padding: 10px 12px; border: 1px solid #cbd5e1; }
+          td { padding: 9px 12px; border: 1px solid #e2e8f0; vertical-align: middle; }
+          tr:nth-child(even) { background: #f8fafc; }
+          .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+          .badge-valid { background: #dcfce7; color: #15803d; }
+          .badge-expiring { background: #fef3c7; color: #b45309; }
+          .badge-expired { background: #fee2e2; color: #b91c1c; }
+          .badge-missing { background: #f1f5f9; color: #64748b; }
+          @media print {
+            body { padding: 0; }
+            @page { margin: 1.5cm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="logo">PAVAN - Cab for Hills</div>
+            <div class="subtitle">Driver Vehicle Insurance Registry & Compliance Report</div>
+          </div>
+          <div class="meta">
+            <div><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
+            <div><strong>Total Records:</strong> ${filtered.length}</div>
+          </div>
+        </div>
+
+        <div class="metrics">
+          <div class="metric-card">
+            <div class="metric-lbl">Total Registered</div>
+            <div class="metric-val">${driverInsurances.length}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-lbl">Active & Valid</div>
+            <div class="metric-val" style="color: #16a34a;">${validCount}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-lbl">Expiring Soon (30d)</div>
+            <div class="metric-val" style="color: #d97706;">${expiringCount}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-lbl">Expired / Missing</div>
+            <div class="metric-val" style="color: #dc2626;">${expiredCount + missingCount}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Driver Name</th>
+              <th>Mobile</th>
+              <th>Vehicle Number</th>
+              <th>Make & Model</th>
+              <th>Policy Number</th>
+              <th>Insurance Expiry</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map((d, idx) => {
+              const badgeClass = d.status === 'VALID' ? 'badge-valid' : d.status === 'EXPIRING_SOON' ? 'badge-expiring' : d.status === 'EXPIRED' ? 'badge-expired' : 'badge-missing';
+              const statusText = d.status === 'VALID' ? `Valid (${d.daysRemaining}d left)` : d.status === 'EXPIRING_SOON' ? `Expiring Soon (${d.daysRemaining}d)` : d.status === 'EXPIRED' ? `Expired (${Math.abs(d.daysRemaining)}d ago)` : 'Not Provided';
+              const expDateStr = d.insuranceExpiryDate ? new Date(d.insuranceExpiryDate).toLocaleDateString() : 'N/A';
+              return `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td><strong>${d.driverName}</strong></td>
+                  <td>${d.driverMobile}</td>
+                  <td style="font-family: monospace; font-weight: 700;">${d.registrationNumber}</td>
+                  <td>${d.make} ${d.model}</td>
+                  <td>${d.insurancePolicyNumber || 'N/A'}</td>
+                  <td>${expDateStr}</td>
+                  <td><span class="badge ${badgeClass}">${statusText}</span></td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  const handleConfirmCancelPackage = async (e) => {
+    e.preventDefault();
+    if (!cancellingPackageBooking) return;
+    setCancellingPackageLoading(true);
+    try {
+      await api.adminCancelPackageBooking(cancellingPackageBooking.id, cancelPackageReason);
+      setPackageBookings(prev => prev.map(b => b.id === cancellingPackageBooking.id ? { ...b, status: 'CANCELLED', notes: cancelPackageReason ? `${b.notes || ''} | Cancelled: ${cancelPackageReason}` : b.notes } : b));
+      triggerAlert('success', `Package booking #${cancellingPackageBooking.id} cancelled successfully`);
+      setShowCancelPackageModal(false);
+      setCancellingPackageBooking(null);
+    } catch (err) {
+      triggerAlert('error', err.message || 'Failed to cancel package booking');
+    } finally {
+      setCancellingPackageLoading(false);
     }
   };
 
@@ -2896,6 +3069,182 @@ export default function App() {
 
           
           {/* LEGAL & POLICIES CMS TAB */}
+          {currentTab === 'insurance' && (
+            <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>Driver Vehicle Insurance Registry</h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.25rem 0 0 0' }}>
+                    Track and monitor mandatory vehicle insurance coverage, expiry dates, and policy statuses.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => {
+                      setLoadingInsurances(true);
+                      api.listDriverInsurances().then(setDriverInsurances).finally(() => setLoadingInsurances(false));
+                    }}
+                    className="btn btn-outline"
+                    title="Reload data"
+                  >
+                    🔄 Refresh
+                  </button>
+                  <button
+                    onClick={handleDownloadInsurancePDF}
+                    className="btn btn-primary"
+                    style={{ fontWeight: 700 }}
+                    title="Generate and Download PDF Report"
+                  >
+                    📄 Download PDF Report
+                  </button>
+                </div>
+              </div>
+
+              {/* Status summary pills */}
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+                {[
+                  { key: 'ALL', label: 'All Drivers', count: driverInsurances.length },
+                  { key: 'VALID', label: 'Valid Insurances', count: driverInsurances.filter(d => d.status === 'VALID').length, color: '#16a34a' },
+                  { key: 'EXPIRING_SOON', label: 'Expiring Soon (30d)', count: driverInsurances.filter(d => d.status === 'EXPIRING_SOON').length, color: '#d97706' },
+                  { key: 'EXPIRED', label: 'Expired', count: driverInsurances.filter(d => d.status === 'EXPIRED').length, color: '#dc2626' },
+                  { key: 'MISSING', label: 'Missing / Not Provided', count: driverInsurances.filter(d => d.status === 'MISSING').length, color: '#64748b' },
+                ].map(p => (
+                  <button
+                    key={p.key}
+                    onClick={() => setInsuranceFilter(p.key)}
+                    style={{
+                      padding: '0.45rem 0.9rem',
+                      borderRadius: '20px',
+                      border: insuranceFilter === p.key ? '2px solid var(--primary)' : '1px solid var(--border)',
+                      background: insuranceFilter === p.key ? 'rgba(249, 115, 22, 0.1)' : 'var(--bg-main)',
+                      color: insuranceFilter === p.key ? 'var(--primary)' : 'var(--text-main)',
+                      fontWeight: insuranceFilter === p.key ? 700 : 500,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}
+                  >
+                    <span>{p.label}</span>
+                    <span style={{
+                      background: p.color ? p.color : 'var(--border)',
+                      color: '#fff',
+                      padding: '1px 6px',
+                      borderRadius: '10px',
+                      fontSize: '0.7rem',
+                      fontWeight: 700
+                    }}>
+                      {p.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Search input */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="🔍 Search by driver name, mobile number, or vehicle registration number..."
+                  value={insuranceSearch}
+                  onChange={(e) => setInsuranceSearch(e.target.value)}
+                  style={{ maxWidth: '420px' }}
+                />
+              </div>
+
+              {loadingInsurances ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  Loading vehicle insurance records...
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Driver Details</th>
+                        <th>Vehicle Info</th>
+                        <th>Insurance Expiry Date</th>
+                        <th>Policy Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {driverInsurances
+                        .filter(d => {
+                          const matchSearch = !insuranceSearch || 
+                            d.driverName.toLowerCase().includes(insuranceSearch.toLowerCase()) ||
+                            d.driverMobile.includes(insuranceSearch) ||
+                            d.registrationNumber.toLowerCase().includes(insuranceSearch.toLowerCase());
+                          if (!matchSearch) return false;
+                          if (insuranceFilter === 'ALL') return true;
+                          return d.status === insuranceFilter;
+                        })
+                        .map(item => (
+                          <tr key={item.vehicleId}>
+                            <td>
+                              <strong>{item.driverName}</strong>
+                              <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{item.driverMobile}</div>
+                              <span className="badge" style={{ fontSize: '0.68rem', marginTop: '0.2rem' }}>{item.driverStatus}</span>
+                            </td>
+                            <td>
+                              <strong style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>{item.registrationNumber}</strong>
+                              <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                                {item.make} {item.model} {item.color ? `(${item.color})` : ''} • {item.seatCapacity} Seats
+                              </div>
+                            </td>
+                            <td>
+                              {item.insuranceExpiryDate ? (
+                                <>
+                                  <strong>{new Date(item.insuranceExpiryDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</strong>
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                    {item.insurancePolicyNumber ? `Policy: ${item.insurancePolicyNumber}` : 'No policy # recorded'}
+                                  </div>
+                                </>
+                              ) : (
+                                <span style={{ color: '#ef4444', fontWeight: 600 }}>Not Provided</span>
+                              )}
+                            </td>
+                            <td>
+                              {item.status === 'VALID' && (
+                                <span className="badge badge-success" style={{ fontWeight: 700 }}>
+                                  ✓ Valid ({item.daysRemaining} days left)
+                                </span>
+                              )}
+                              {item.status === 'EXPIRING_SOON' && (
+                                <span className="badge badge-warning" style={{ fontWeight: 700, background: '#fef3c7', color: '#b45309' }}>
+                                  ⚠️ Expiring in {item.daysRemaining} days
+                                </span>
+                              )}
+                              {item.status === 'EXPIRED' && (
+                                <span className="badge badge-danger" style={{ fontWeight: 700 }}>
+                                  ⛔ Expired ({Math.abs(item.daysRemaining)} days ago)
+                                </span>
+                              )}
+                              {item.status === 'MISSING' && (
+                                <span className="badge" style={{ fontWeight: 600, background: '#f1f5f9', color: '#64748b' }}>
+                                  Missing Expiry Date
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              <button
+                                className="btn btn-outline"
+                                style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
+                                onClick={() => handleViewUserProfile({ id: item.driverId })}
+                              >
+                                View Driver Profile
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {currentTab === 'policies' && (
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1.25rem' }}>
@@ -3806,6 +4155,409 @@ export default function App() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* CANCEL PACKAGE BOOKING CONFIRMATION MODAL */}
+      {showCancelPackageModal && cancellingPackageBooking && (
+        <div className="modal-overlay" onClick={() => setShowCancelPackageModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3 style={{ color: 'var(--danger)', margin: 0 }}>Cancel Package Booking</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0 0' }}>
+                Are you sure you want to cancel booking #{cancellingPackageBooking.id}?
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+                Package: <strong>{cancellingPackageBooking.packageTitle || cancellingPackageBooking.packageCode}</strong>
+              </div>
+              <div style={{ fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+                Passenger: <strong>{cancellingPackageBooking.passenger?.name || cancellingPackageBooking.passengerUserId}</strong> ({cancellingPackageBooking.passenger?.mobile})
+              </div>
+              <div style={{ fontSize: '0.85rem' }}>
+                Travel Date: <strong>{new Date(cancellingPackageBooking.travelDate).toLocaleDateString()}</strong>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmCancelPackage}>
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label">Cancellation Reason (optional)</label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  placeholder="State the reason for cancelling this booking..."
+                  value={cancelPackageReason}
+                  onChange={(e) => setCancelPackageReason(e.target.value)}
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowCancelPackageModal(false)}
+                  disabled={cancellingPackageLoading}
+                >
+                  Keep Booking
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-danger"
+                  disabled={cancellingPackageLoading}
+                >
+                  {cancellingPackageLoading ? 'Cancelling...' : 'Confirm Cancellation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT USER PROFILE & KYC MODAL */}
+      {showEditProfileModal && editProfileForm && (
+        <div className="modal-overlay" onClick={() => setShowEditProfileModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '820px', maxHeight: '92vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ margin: 0 }}>✏️ Edit Profile & KYC Details</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.25rem 0 0 0' }}>
+                  Update user information, driver approval status, KYC verification states, and vehicle specifications.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
+                onClick={() => setShowEditProfileModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfileSubmit}>
+              {/* Personal Details */}
+              <div style={{ marginBottom: '1.5rem', background: 'var(--bg-main)', padding: '1.2rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  1. Personal & Account Information
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Full Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editProfileForm.name}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, name: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Mobile Number</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editProfileForm.mobile}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, mobile: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email Address</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      value={editProfileForm.email}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Gender</label>
+                    <select
+                      className="form-control"
+                      value={editProfileForm.gender}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, gender: e.target.value }))}
+                    >
+                      <option value="MALE">Male</option>
+                      <option value="FEMALE">Female</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Account Status</label>
+                    <select
+                      className="form-control"
+                      value={editProfileForm.accountStatus}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, accountStatus: e.target.value }))}
+                    >
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="SUSPENDED">SUSPENDED</option>
+                      <option value="DELETED">DELETED</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Driver Status</label>
+                    <select
+                      className="form-control"
+                      value={editProfileForm.driverStatus}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, driverStatus: e.target.value }))}
+                    >
+                      <option value="NOT_APPLIED">NOT_APPLIED</option>
+                      <option value="DOCUMENTS_PARTIAL">DOCUMENTS_PARTIAL</option>
+                      <option value="IN_REVIEW">IN_REVIEW</option>
+                      <option value="APPROVED">APPROVED</option>
+                      <option value="REJECTED">REJECTED</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payout & Bank Info */}
+              <div style={{ marginBottom: '1.5rem', background: 'var(--bg-main)', padding: '1.2rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  2. Driver Payout Bank & UPI Information
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Account Holder Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editProfileForm.accountHolderName}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, accountHolderName: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Account Number</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editProfileForm.accountNumber}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, accountNumber: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">IFSC Code</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editProfileForm.ifscCode}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, ifscCode: e.target.value.toUpperCase() }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Branch Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editProfileForm.branchName}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, branchName: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">UPI ID</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editProfileForm.upiId}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, upiId: e.target.value.toLowerCase() }))}
+                      placeholder="e.g. driver@upi"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* KYC Document Verification */}
+              <div style={{ marginBottom: '1.5rem', background: 'var(--bg-main)', padding: '1.2rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  3. KYC Document Verifications (Cashfree / Manual)
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                  <div style={{ background: 'var(--card-bg)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        id="aadhaarVer"
+                        checked={editProfileForm.aadhaarVerified}
+                        onChange={(e) => setEditProfileForm(p => ({ ...p, aadhaarVerified: e.target.checked }))}
+                      />
+                      <label htmlFor="aadhaarVer" style={{ fontWeight: 700, cursor: 'pointer' }}>Aadhaar Verified</label>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Masked Aadhaar</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={editProfileForm.aadhaarNumberMasked}
+                        onChange={(e) => setEditProfileForm(p => ({ ...p, aadhaarNumberMasked: e.target.value }))}
+                        placeholder="XXXX-XXXX-1234"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Aadhaar Name</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={editProfileForm.aadhaarName}
+                        onChange={(e) => setEditProfileForm(p => ({ ...p, aadhaarName: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--card-bg)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        id="panVer"
+                        checked={editProfileForm.panVerified}
+                        onChange={(e) => setEditProfileForm(p => ({ ...p, panVerified: e.target.checked }))}
+                      />
+                      <label htmlFor="panVer" style={{ fontWeight: 700, cursor: 'pointer' }}>PAN Verified</label>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>PAN Number</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={editProfileForm.panNumber}
+                        onChange={(e) => setEditProfileForm(p => ({ ...p, panNumber: e.target.value.toUpperCase() }))}
+                        placeholder="ABCDE1234F"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Registered Name</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={editProfileForm.panName}
+                        onChange={(e) => setEditProfileForm(p => ({ ...p, panName: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--card-bg)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        id="bankVer"
+                        checked={editProfileForm.bankVerified}
+                        onChange={(e) => setEditProfileForm(p => ({ ...p, bankVerified: e.target.checked }))}
+                      />
+                      <label htmlFor="bankVer" style={{ fontWeight: 700, cursor: 'pointer' }}>Bank Verified</label>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Bank Name</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={editProfileForm.bankName}
+                        onChange={(e) => setEditProfileForm(p => ({ ...p, bankName: e.target.value }))}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Name at Bank</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={editProfileForm.bankNameAtBank}
+                        onChange={(e) => setEditProfileForm(p => ({ ...p, bankNameAtBank: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vehicle & Insurance */}
+              <div style={{ marginBottom: '1.5rem', background: 'var(--bg-main)', padding: '1.2rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  4. Vehicle & Mandatory Insurance Details
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Registration Number</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editProfileForm.vehicleReg}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, vehicleReg: e.target.value.toUpperCase() }))}
+                      placeholder="e.g. UK07TD1234"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Make</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editProfileForm.vehicleMake}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, vehicleMake: e.target.value }))}
+                      placeholder="e.g. Maruti Suzuki"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Model</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editProfileForm.vehicleModel}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, vehicleModel: e.target.value }))}
+                      placeholder="e.g. Dzire"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Color</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editProfileForm.vehicleColor}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, vehicleColor: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Seat Capacity</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={editProfileForm.vehicleSeats}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, vehicleSeats: Number(e.target.value) }))}
+                      min="1"
+                      max="8"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                      🛡️ Insurance Expiry Date
+                    </label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={editProfileForm.insuranceExpiryDate || ''}
+                      onChange={(e) => setEditProfileForm(p => ({ ...p, insuranceExpiryDate: e.target.value }))}
+                    />
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Mandatory for drivers to offer rides</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowEditProfileModal(false)}
+                  disabled={savingProfile}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingProfile}
+                >
+                  {savingProfile ? 'Saving Changes...' : 'Save Profile & KYC Details'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

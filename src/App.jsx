@@ -95,6 +95,7 @@ export default function App() {
   const [selectedPackageBooking, setSelectedPackageBooking] = useState(null);
   const [showAllocateModal, setShowAllocateModal] = useState(false);
   const [allocationDriverId, setAllocationDriverId] = useState('');
+  const [driverSearchTerm, setDriverSearchTerm] = useState('');
   const [packageBookingPage, setPackageBookingPage] = useState(1);
   const [packageBookingLimit, setPackageBookingLimit] = useState(10);
   const [copiedId, setCopiedId] = useState('');
@@ -3165,85 +3166,195 @@ export default function App() {
       )}
 
       {/* ALLOCATE PACKAGE BOOKING MODAL */}
-      {showAllocateModal && selectedPackageBooking && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3>Allocate Driver & Vehicle</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
-                Select an approved driver from the database to manually allocate to <strong>{selectedPackageBooking.packageTitle || selectedPackageBooking.packageName}</strong> (Booking ID: {selectedPackageBooking.id}).
-              </p>
-            </div>
-            <form onSubmit={handleAllocateBooking}>
-              <div className="form-group">
-                <label className="form-label">Approved Driver</label>
-                <select
-                  className="form-control"
-                  value={allocationDriverId}
-                  onChange={(e) => setAllocationDriverId(e.target.value)}
-                  required
-                >
-                  <option value="">-- Select Driver --</option>
-                  {users
-                    .filter(u => u.roles?.includes('DRIVER') && u.driverStatus === 'APPROVED' && u.vehicle && u.accountStatus === 'ACTIVE')
-                    .map(driver => (
+      {showAllocateModal && selectedPackageBooking && (() => {
+        const approvedDrivers = users
+          .filter(u => u.roles?.includes('DRIVER') && u.driverStatus === 'APPROVED' && u.vehicle && (u.accountStatus === 'ACTIVE' || !u.accountStatus))
+          .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+
+        const filteredDrivers = approvedDrivers.filter(driver => {
+          if (!driverSearchTerm.trim()) return true;
+          const term = driverSearchTerm.toLowerCase().trim();
+          const name = (driver.name || '').toLowerCase();
+          const mobile = (driver.mobile || '').toLowerCase();
+          const vehicleInfo = `${driver.vehicle?.registrationNumber || ''} ${driver.vehicle?.make || ''} ${driver.vehicle?.model || ''}`.toLowerCase();
+          return name.includes(term) || mobile.includes(term) || vehicleInfo.includes(term);
+        });
+
+        return (
+          <div className="modal-overlay">
+            <div className="modal-content" style={{ maxWidth: '580px', width: '95%' }}>
+              <div className="modal-header">
+                <h3>Allocate Driver & Vehicle</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                  Select an approved driver from the database to manually allocate to <strong>{selectedPackageBooking.packageTitle || selectedPackageBooking.packageName}</strong> (Booking ID: {selectedPackageBooking.id}).
+                </p>
+              </div>
+              <form onSubmit={handleAllocateBooking}>
+                {/* Search & Filter Driver Input */}
+                <div className="form-group" style={{ marginBottom: '1.2rem' }}>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700 }}>🔍 Filter Driver (Search Name or Number)</span>
+                    {driverSearchTerm && (
+                      <button 
+                        type="button" 
+                        onClick={() => setDriverSearchTerm('')} 
+                        style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, padding: 0 }}
+                      >
+                        ✕ Clear Filter
+                      </button>
+                    )}
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Search driver by name or mobile number (e.g. Rahul or 9876)..."
+                      value={driverSearchTerm}
+                      onChange={(e) => setDriverSearchTerm(e.target.value)}
+                      style={{ paddingLeft: '2.4rem', fontSize: '0.92rem' }}
+                      autoFocus
+                    />
+                    <span style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.6, fontSize: '0.95rem' }}>
+                      🔎
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    <span>Sorted alphabetically (A → Z)</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {driverSearchTerm.trim() 
+                        ? `${filteredDrivers.length} matching of ${approvedDrivers.length} drivers` 
+                        : `Total ${approvedDrivers.length} approved drivers`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Driver Select Dropdown */}
+                <div className="form-group" style={{ marginBottom: '1.2rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700 }}>
+                    Approved Driver <span style={{ color: 'var(--primary)' }}>*</span>
+                  </label>
+                  <select
+                    className="form-control"
+                    value={allocationDriverId}
+                    onChange={(e) => setAllocationDriverId(e.target.value)}
+                    required
+                    style={{ fontSize: '0.92rem', padding: '0.65rem 0.85rem' }}
+                  >
+                    <option value="">
+                      {filteredDrivers.length === 0 
+                        ? `-- No drivers match "${driverSearchTerm}" --` 
+                        : `-- Select Driver (${filteredDrivers.length} Available) --`}
+                    </option>
+                    {filteredDrivers.map(driver => (
                       <option key={driver.id || driver._id} value={driver.id || driver._id}>
-                        {driver.name} ({driver.mobile}) - {driver.vehicle.make || ''} {driver.vehicle.model || ''} ({driver.vehicle.registrationNumber || ''})
+                        {driver.name} ({driver.mobile}) — {driver.vehicle.make || ''} {driver.vehicle.model || ''} [{driver.vehicle.registrationNumber || 'No plate'}]
                       </option>
                     ))}
-                </select>
-              </div>
-
-              {allocationDriverId && (
-                <div style={{
-                  padding: '1rem',
-                  backgroundColor: 'var(--bg-main)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-sm)',
-                  marginBottom: '1.5rem',
-                  fontSize: '0.85rem'
-                }}>
-                  {(() => {
-                    const selectedDriver = users.find(u => (u.id === allocationDriverId || u._id === allocationDriverId));
-                    if (!selectedDriver) return null;
-                    if (!selectedDriver.vehicle) {
-                      return <span style={{ color: 'var(--error)', fontWeight: 700 }}>⚠️ This driver does not have any registered vehicle. You cannot allocate this driver.</span>;
-                    }
-                    return (
-                      <>
-                        <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>Allocated Vehicle Details</strong>
-                        <div style={{ fontWeight: 700 }}>🚗 {selectedDriver.vehicle.make} {selectedDriver.vehicle.model} ({selectedDriver.vehicle.color})</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                          Registration No: <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-main)' }}>{selectedDriver.vehicle.registrationNumber}</span> | Capacity: {selectedDriver.vehicle.seatCapacity} seats
-                        </div>
-                      </>
-                    );
-                  })()}
+                  </select>
                 </div>
-              )}
 
-              <div className="modal-footer">
-                <button type="button" className="btn btn-outline" onClick={() => setShowAllocateModal(false)}>
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-secondary"
-                  disabled={
-                    !allocationDriverId || 
-                    !(() => {
+                {/* Quick Select Matching Pills (when searching) */}
+                {driverSearchTerm.trim() && filteredDrivers.length > 0 && (
+                  <div style={{ marginBottom: '1.2rem' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
+                      Quick Select Matches:
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '150px', overflowY: 'auto' }}>
+                      {filteredDrivers.slice(0, 6).map(driver => {
+                        const isSelected = (allocationDriverId === (driver.id || driver._id));
+                        return (
+                          <div
+                            key={driver.id || driver._id}
+                            onClick={() => setAllocationDriverId(driver.id || driver._id)}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              borderRadius: 'var(--radius-sm)',
+                              border: `1.5px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
+                              backgroundColor: isSelected ? 'rgba(255, 140, 0, 0.08)' : 'var(--bg-main)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div>
+                              <strong style={{ color: isSelected ? 'var(--primary)' : 'inherit', fontSize: '0.88rem' }}>
+                                {driver.name}
+                              </strong>
+                              <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                📞 {driver.mobile}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                              🚗 {driver.vehicle?.registrationNumber || ''}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Selected Driver Vehicle Details */}
+                {allocationDriverId && (
+                  <div style={{
+                    padding: '1rem',
+                    backgroundColor: 'var(--bg-main)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-sm)',
+                    marginBottom: '1.5rem',
+                    fontSize: '0.85rem'
+                  }}>
+                    {(() => {
                       const selectedDriver = users.find(u => (u.id === allocationDriverId || u._id === allocationDriverId));
-                      return selectedDriver && selectedDriver.vehicle;
-                    })()
-                  }
-                >
-                  Allocate & Confirm
-                </button>
-              </div>
-            </form>
+                      if (!selectedDriver) return null;
+                      if (!selectedDriver.vehicle) {
+                        return <span style={{ color: 'var(--error)', fontWeight: 700 }}>⚠️ This driver does not have any registered vehicle. You cannot allocate this driver.</span>;
+                      }
+                      return (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                            <strong style={{ color: 'var(--primary)', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                              Allocated Vehicle Details
+                            </strong>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--success)' }}>
+                              ✓ Driver: {selectedDriver.name} ({selectedDriver.mobile})
+                            </span>
+                          </div>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>🚗 {selectedDriver.vehicle.make} {selectedDriver.vehicle.model} {selectedDriver.vehicle.color ? `(${selectedDriver.vehicle.color})` : ''}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                            Registration No: <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--text-main)' }}>{selectedDriver.vehicle.registrationNumber}</span> | Capacity: {selectedDriver.vehicle.seatCapacity} seats
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-outline" onClick={() => setShowAllocateModal(false)}>
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-secondary"
+                    disabled={
+                      !allocationDriverId || 
+                      !(() => {
+                        const selectedDriver = users.find(u => (u.id === allocationDriverId || u._id === allocationDriverId));
+                        return selectedDriver && selectedDriver.vehicle;
+                      })()
+                    }
+                  >
+                    Allocate & Confirm
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       {/* LOCATION FORM MODAL */}
       {showLocationModal && (
         <div className="modal-overlay">

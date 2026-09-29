@@ -1141,10 +1141,11 @@ export default function App() {
 
   const resolveImageUrl = (url) => {
     if (!url) return '';
-    if (url.startsWith('/')) {
-      return `https://api.parvatiyavahan.com${url}`;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
     }
-    return url;
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+    return `https://api.parvatiyavahan.com${cleanUrl}`;
   };
 
   const renderPagination = (currentPage, totalPages, limit, totalEntries, onPageChange, onLimitChange, isTop = false) => {
@@ -2040,19 +2041,25 @@ export default function App() {
                               <span className={`badge ${doc.status === 'VERIFIED' ? 'badge-success' : doc.status === 'REJECTED' ? 'badge-error' : 'badge-warning'}`}>
                                 {doc.status?.replace(/_/g, ' ')}
                               </span>
-                              {doc.uploadUrl && (
-                                <button
-                                  className="btn btn-outline"
-                                  onClick={() => setPreviewDocModal({
-                                    url: resolveImageUrl(doc.uploadUrl),
-                                    title: doc.documentType?.replace(/_/g, ' ') || 'Document Preview',
-                                    mimeType: doc.mimeType,
-                                  })}
-                                  style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
-                                >
-                                  👁️ View
-                                </button>
-                              )}
+                              {(() => {
+                                const docUrl = doc.uploadUrl || doc.upload?.uploadUrl || doc.url || (doc.upload && (doc.upload.privateUrl || doc.upload.publicUrl));
+                                if (!docUrl) return null;
+                                return (
+                                  <button
+                                    className="btn btn-outline"
+                                    onClick={() => setPreviewDocModal({
+                                      url: resolveImageUrl(docUrl),
+                                      title: doc.documentType?.replace(/_/g, ' ') || 'Document Preview',
+                                      mimeType: doc.mimeType,
+                                      fileName: doc.originalFileName || '',
+                                    })}
+                                    style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                                    title="Click to preview full document"
+                                  >
+                                    👁️ View
+                                  </button>
+                                );
+                              })()}
                             </div>
                           </div>
                         ))}
@@ -4683,6 +4690,103 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* DOCUMENT PREVIEW MODAL */}
+      {previewDocModal && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setPreviewDocModal(null)} 
+          style={{ zIndex: 2000, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)' }}
+        >
+          <div 
+            className="modal-content" 
+            onClick={e => e.stopPropagation()} 
+            style={{ maxWidth: '840px', width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: '1.5rem', borderRadius: 'var(--radius-md)' }}
+          >
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
+                  📄 {previewDocModal.title || 'Document Preview'}
+                </h3>
+                {previewDocModal.fileName && (
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    File: {previewDocModal.fileName}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {previewDocModal.url && (
+                  <a
+                    href={previewDocModal.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-outline"
+                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    Open in New Tab ↗
+                  </a>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setPreviewDocModal(null)}
+                  style={{ fontSize: '0.9rem', padding: '0.35rem 0.7rem', fontWeight: 700, borderRadius: '50%', minWidth: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  title="Close Preview"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minHeight: '320px', maxHeight: '68vh', overflowY: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'var(--bg-main)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '0.75rem' }}>
+              {previewDocModal.url ? (
+                previewDocModal.url.toLowerCase().endsWith('.pdf') || previewDocModal.mimeType?.includes('pdf') ? (
+                  <iframe
+                    src={previewDocModal.url}
+                    title={previewDocModal.title}
+                    style={{ width: '100%', height: '62vh', border: 'none', borderRadius: '4px' }}
+                  />
+                ) : (
+                  <img
+                    src={previewDocModal.url}
+                    alt={previewDocModal.title}
+                    style={{ maxWidth: '100%', maxHeight: '64vh', objectFit: 'contain', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      if (e.target.parentNode) {
+                        e.target.parentNode.innerHTML = `
+                          <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">⚠️</div>
+                            <p style="margin: 0 0 1rem 0; font-weight: 600; color: var(--text-main);">Unable to display image preview directly.</p>
+                            <a href="${previewDocModal.url}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="display: inline-block; padding: 0.55rem 1.25rem; text-decoration: none; border-radius: 6px; font-weight: 700; color: white;">
+                              Open or Download File in New Tab ↗
+                            </a>
+                          </div>
+                        `;
+                      }
+                    }}
+                  />
+                )
+              ) : (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                  No preview URL available for this document.
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setPreviewDocModal(null)}
+                style={{ padding: '0.5rem 1.5rem', fontWeight: 600 }}
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

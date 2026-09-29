@@ -83,6 +83,209 @@ const Icons = {
   )
 };
 
+function DocumentPreviewModal({ modal, onClose }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [isPdf, setIsPdf] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    let createdUrl = null;
+
+    if (!modal?.url) {
+      setError('No preview URL available for this document.');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setZoom(1);
+    setRotation(0);
+
+    const checkPdf = modal.url.toLowerCase().includes('.pdf') || modal.mimeType?.includes('pdf');
+    setIsPdf(checkPdf);
+
+    fetch(modal.url)
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 404) {
+            throw new Error('This document file was not found on the storage server (HTTP 404).');
+          } else if (res.status === 401 || res.status === 403) {
+            throw new Error('Access to this document was not authorized (HTTP ' + res.status + ').');
+          } else {
+            throw new Error('Server returned HTTP ' + res.status + ' while loading document.');
+          }
+        }
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('pdf')) {
+          setIsPdf(true);
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        if (!active) return;
+        createdUrl = URL.createObjectURL(blob);
+        setBlobUrl(createdUrl);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err.message || 'Unable to display document preview.');
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+      if (createdUrl) {
+        URL.revokeObjectURL(createdUrl);
+      }
+    };
+  }, [modal?.url, modal?.mimeType]);
+
+  return (
+    <div 
+      className="modal-overlay" 
+      onClick={onClose} 
+      style={{ zIndex: 2000, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)' }}
+    >
+      <div 
+        className="modal-content" 
+        onClick={e => e.stopPropagation()} 
+        style={{ maxWidth: '840px', width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: '1.5rem', borderRadius: 'var(--radius-md)' }}
+      >
+        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
+              📄 {modal.title || 'Document Preview'}
+            </h3>
+            {modal.fileName && (
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                File: {modal.fileName}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={onClose}
+            style={{ fontSize: '0.9rem', padding: '0.35rem 0.7rem', fontWeight: 700, borderRadius: '50%', minWidth: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="Close Preview"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Interactive Controls for Images */}
+        {!loading && !error && blobUrl && !isPdf && (
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem', padding: '0.4rem 0.75rem', background: 'var(--bg-main)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setZoom(z => Math.min(z + 0.25, 3))}
+              style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+              title="Zoom In"
+            >
+              🔍 +
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setZoom(z => Math.max(z - 0.25, 0.5))}
+              style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+              title="Zoom Out"
+            >
+              🔍 -
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setRotation(r => (r + 90) % 360)}
+              style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+              title="Rotate 90°"
+            >
+              ⟳ Rotate
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => { setZoom(1); setRotation(0); }}
+              style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+              title="Reset Zoom & Rotation"
+            >
+              ↺ Reset
+            </button>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 600 }}>
+              {Math.round(zoom * 100)}%
+            </span>
+          </div>
+        )}
+
+        <div style={{ flex: 1, minHeight: '320px', maxHeight: '66vh', overflowY: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'var(--bg-main)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '0.75rem' }}>
+          {loading && (
+            <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+              <div className="spinner" style={{ margin: '0 auto 1rem auto' }} />
+              <p style={{ margin: 0, fontWeight: 600 }}>Loading document preview...</p>
+            </div>
+          )}
+
+          {!loading && error && (
+            <div style={{ textAlign: 'center', padding: '2.5rem 1.5rem', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>⚠️</div>
+              <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-main)', fontWeight: 700 }}>
+                Document Preview Unavailable
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.85rem', maxWidth: '420px', lineHeight: 1.5 }}>
+                {error}
+              </p>
+            </div>
+          )}
+
+          {!loading && !error && blobUrl && (
+            isPdf ? (
+              <iframe
+                src={blobUrl}
+                title={modal.title || 'Document'}
+                style={{ width: '100%', height: '62vh', border: 'none', borderRadius: '4px' }}
+              />
+            ) : (
+              <div style={{ overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}>
+                <img
+                  src={blobUrl}
+                  alt={modal.title || 'Document'}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '62vh',
+                    objectFit: 'contain',
+                    borderRadius: '4px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                    transition: 'transform 0.2s ease',
+                  }}
+                />
+              </div>
+            )
+          )}
+        </div>
+
+        <div className="modal-footer" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onClose}
+            style={{ padding: '0.5rem 1.5rem', fontWeight: 600 }}
+          >
+            Close Preview
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [theme, setTheme] = useState('light');
@@ -4692,99 +4895,10 @@ export default function App() {
       )}
       {/* DOCUMENT PREVIEW MODAL */}
       {previewDocModal && (
-        <div 
-          className="modal-overlay" 
-          onClick={() => setPreviewDocModal(null)} 
-          style={{ zIndex: 2000, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)' }}
-        >
-          <div 
-            className="modal-content" 
-            onClick={e => e.stopPropagation()} 
-            style={{ maxWidth: '840px', width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: '1.5rem', borderRadius: 'var(--radius-md)' }}
-          >
-            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
-                  📄 {previewDocModal.title || 'Document Preview'}
-                </h3>
-                {previewDocModal.fileName && (
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    File: {previewDocModal.fileName}
-                  </span>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                {previewDocModal.url && (
-                  <a
-                    href={previewDocModal.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-outline"
-                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                  >
-                    Open in New Tab ↗
-                  </a>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setPreviewDocModal(null)}
-                  style={{ fontSize: '0.9rem', padding: '0.35rem 0.7rem', fontWeight: 700, borderRadius: '50%', minWidth: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  title="Close Preview"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <div style={{ flex: 1, minHeight: '320px', maxHeight: '68vh', overflowY: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'var(--bg-main)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '0.75rem' }}>
-              {previewDocModal.url ? (
-                previewDocModal.url.toLowerCase().endsWith('.pdf') || previewDocModal.mimeType?.includes('pdf') ? (
-                  <iframe
-                    src={previewDocModal.url}
-                    title={previewDocModal.title}
-                    style={{ width: '100%', height: '62vh', border: 'none', borderRadius: '4px' }}
-                  />
-                ) : (
-                  <img
-                    src={previewDocModal.url}
-                    alt={previewDocModal.title}
-                    style={{ maxWidth: '100%', maxHeight: '64vh', objectFit: 'contain', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      if (e.target.parentNode) {
-                        e.target.parentNode.innerHTML = `
-                          <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">⚠️</div>
-                            <p style="margin: 0 0 1rem 0; font-weight: 600; color: var(--text-main);">Unable to display image preview directly.</p>
-                            <a href="${previewDocModal.url}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="display: inline-block; padding: 0.55rem 1.25rem; text-decoration: none; border-radius: 6px; font-weight: 700; color: white;">
-                              Open or Download File in New Tab ↗
-                            </a>
-                          </div>
-                        `;
-                      }
-                    }}
-                  />
-                )
-              ) : (
-                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                  No preview URL available for this document.
-                </div>
-              )}
-            </div>
-
-            <div className="modal-footer" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setPreviewDocModal(null)}
-                style={{ padding: '0.5rem 1.5rem', fontWeight: 600 }}
-              >
-                Close Preview
-              </button>
-            </div>
-          </div>
-        </div>
+        <DocumentPreviewModal
+          modal={previewDocModal}
+          onClose={() => setPreviewDocModal(null)}
+        />
       )}
 
     </div>

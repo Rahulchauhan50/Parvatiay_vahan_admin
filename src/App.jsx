@@ -736,7 +736,12 @@ export default function App() {
       } else if (currentTab === 'pricing') {
         setLoadingPricing(true);
         const data = await api.getPricingSettings();
-        setPricing(data.settings);
+        const settings = data?.settings || {};
+        const cachedAdvance = localStorage.getItem('pv_fullTaxiBookingAdvance');
+        if ((settings.fullTaxiBookingAdvance === undefined || settings.fullTaxiBookingAdvance === null) && cachedAdvance !== null) {
+          settings.fullTaxiBookingAdvance = Number(cachedAdvance);
+        }
+        setPricing(settings);
       } else if (currentTab === 'packages') {
         setLoadingPackageBookings(true);
         const [bookingsData, usersData] = await Promise.all([
@@ -1305,7 +1310,18 @@ export default function App() {
     e.preventDefault();
     setSavingPricing(true);
     try {
-      await api.updatePricingSettings(pricing);
+      if (pricing?.fullTaxiBookingAdvance !== undefined && pricing?.fullTaxiBookingAdvance !== null) {
+        localStorage.setItem('pv_fullTaxiBookingAdvance', String(pricing.fullTaxiBookingAdvance));
+      }
+      const res = await api.updatePricingSettings(pricing);
+      const updated = res?.data?.settings || res?.settings;
+      if (updated) {
+        setPricing(prev => ({
+          ...prev,
+          ...updated,
+          fullTaxiBookingAdvance: pricing.fullTaxiBookingAdvance ?? updated.fullTaxiBookingAdvance ?? 1000,
+        }));
+      }
       setPricingSuccess(true);
       setTimeout(() => setPricingSuccess(false), 3000);
       triggerAlert('success', 'Pricing settings updated.');

@@ -114,6 +114,7 @@ export default function App() {
   const [selectedUserProfile, setSelectedUserProfile] = useState(null);
   const [showUserProfileModal, setShowUserProfileModal] = useState(false);
   const [viewingUserProfile, setViewingUserProfile] = useState(null);
+  const [profileReturnTab, setProfileReturnTab] = useState('users');
   const [loadingUserProfile, setLoadingUserProfile] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [editProfileForm, setEditProfileForm] = useState(null);
@@ -152,7 +153,9 @@ export default function App() {
 
 
   // --- COMPLETE PROFILE PAGE HANDLERS ---
-  const handleOpenUserProfile = async (user) => {
+  const handleOpenUserProfile = async (user, fromTab = 'users') => {
+    setProfileReturnTab(fromTab);
+    setCurrentTab('users');
     setViewingUserProfile(user);
     setSelectedUserProfile(user);
     setLoadingUserProfile(true);
@@ -929,6 +932,7 @@ export default function App() {
     }
 
     const filtered = driverInsurances.filter(d => {
+      if (d.accountStatus === 'DELETED' || d.driverName === 'Deleted User' || (d.driverMobile && d.driverMobile.startsWith('deleted_'))) return false;
       const matchSearch = !insuranceSearch || 
         d.driverName.toLowerCase().includes(insuranceSearch.toLowerCase()) ||
         d.driverMobile.includes(insuranceSearch) ||
@@ -1639,10 +1643,15 @@ export default function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                 <button
                   className="btn btn-outline"
-                  onClick={() => setViewingUserProfile(null)}
+                  onClick={() => {
+                    setViewingUserProfile(null);
+                    if (profileReturnTab && profileReturnTab !== 'users') {
+                      navigateToTab(profileReturnTab);
+                    }
+                  }}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}
                 >
-                  ← Back to Users List
+                  ← Back to {profileReturnTab === 'insurance' ? 'Driver Insurances' : 'Users List'}
                 </button>
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <button
@@ -3088,7 +3097,16 @@ export default function App() {
 
           
           {/* LEGAL & POLICIES CMS TAB */}
-          {currentTab === 'insurance' && (
+          {currentTab === 'insurance' && (() => {
+            const activeDriverInsurances = driverInsurances.filter(d => {
+              if (!d.driverId) return false;
+              if (d.accountStatus === 'DELETED') return false;
+              if (d.driverName === 'Deleted User') return false;
+              if (d.driverMobile && d.driverMobile.startsWith('deleted_')) return false;
+              return true;
+            });
+
+            return (
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div>
@@ -3122,11 +3140,11 @@ export default function App() {
               {/* Status summary pills */}
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
                 {[
-                  { key: 'ALL', label: 'All Drivers', count: driverInsurances.length },
-                  { key: 'VALID', label: 'Valid Insurances', count: driverInsurances.filter(d => d.status === 'VALID').length, color: '#16a34a' },
-                  { key: 'EXPIRING_SOON', label: 'Expiring Soon (30d)', count: driverInsurances.filter(d => d.status === 'EXPIRING_SOON').length, color: '#d97706' },
-                  { key: 'EXPIRED', label: 'Expired', count: driverInsurances.filter(d => d.status === 'EXPIRED').length, color: '#dc2626' },
-                  { key: 'MISSING', label: 'Missing / Not Provided', count: driverInsurances.filter(d => d.status === 'MISSING').length, color: '#64748b' },
+                  { key: 'ALL', label: 'All Drivers', count: activeDriverInsurances.length },
+                  { key: 'VALID', label: 'Valid Insurances', count: activeDriverInsurances.filter(d => d.status === 'VALID').length, color: '#16a34a' },
+                  { key: 'EXPIRING_SOON', label: 'Expiring Soon (30d)', count: activeDriverInsurances.filter(d => d.status === 'EXPIRING_SOON').length, color: '#d97706' },
+                  { key: 'EXPIRED', label: 'Expired', count: activeDriverInsurances.filter(d => d.status === 'EXPIRED').length, color: '#dc2626' },
+                  { key: 'MISSING', label: 'Missing / Not Provided', count: activeDriverInsurances.filter(d => d.status === 'MISSING').length, color: '#64748b' },
                 ].map(p => (
                   <button
                     key={p.key}
@@ -3189,7 +3207,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {driverInsurances
+                      {activeDriverInsurances
                         .filter(d => {
                           const matchSearch = !insuranceSearch || 
                             d.driverName.toLowerCase().includes(insuranceSearch.toLowerCase()) ||
@@ -3250,7 +3268,7 @@ export default function App() {
                               <button
                                 className="btn btn-outline"
                                 style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
-                                onClick={() => handleViewUserProfile({ id: item.driverId })}
+                                onClick={() => handleOpenUserProfile({ id: item.driverId, _id: item.driverId, name: item.driverName, mobile: item.driverMobile }, 'insurance')}
                               >
                                 View Driver Profile
                               </button>
@@ -3262,7 +3280,8 @@ export default function App() {
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
           {currentTab === 'policies' && (
             <div className="card">

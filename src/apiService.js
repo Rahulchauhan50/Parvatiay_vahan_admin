@@ -257,6 +257,53 @@ export const allocatePackageBooking = async (bookingId, driverId, vehicleId) => 
   return data.data || data;
 };
 
+// Special Chardham Tour Packages Management APIs
+export const listAdminPackages = async () => {
+  try {
+    const res = await fetch(`${BASE_URL}/admin/packages`, {
+      headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.data?.packages || data.packages || data;
+    }
+  } catch (_) {}
+
+  // Fallback to public packages endpoint
+  const res = await fetch(`${BASE_URL}/packages`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to fetch packages');
+  return data.data?.packages || data.packages || data;
+};
+
+export const updateAdminPackage = async (code, updateData) => {
+  const res = await fetch(`${BASE_URL}/admin/packages/${code}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify(updateData)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to update package');
+  return data.data?.package || data.package || data;
+};
+
+export const toggleAdminPackageStatus = async (code, isActive) => {
+  const res = await fetch(`${BASE_URL}/admin/packages/${code}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify({ isActive })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to update package status');
+  return data.data?.package || data.package || data;
+};
+
 // Predefined Locations Management APIs
 export const listAdminLocations = async () => {
   const res = await fetch(`${BASE_URL}/admin/locations`, {

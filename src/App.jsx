@@ -303,6 +303,15 @@ export default function App() {
   const [packageBookingLimit, setPackageBookingLimit] = useState(10);
   const [copiedId, setCopiedId] = useState('');
 
+  // --- CHARDHAM PACKAGES STATE ---
+  const [chardhamPackages, setChardhamPackages] = useState([]);
+  const [loadingChardhamPackages, setLoadingChardhamPackages] = useState(false);
+  const [packageSubTab, setPackageSubTab] = useState('catalog'); // 'catalog' or 'bookings'
+  const [editingChardhamPackage, setEditingChardhamPackage] = useState(null);
+  const [showEditChardhamModal, setShowEditChardhamModal] = useState(false);
+  const [savingChardhamPackage, setSavingChardhamPackage] = useState(false);
+  const [togglingPackageCode, setTogglingPackageCode] = useState(null);
+
   // --- POLICIES & CMS STATE ---
   const [policiesList, setPoliciesList] = useState([]);
   const [loadingPolicies, setLoadingPolicies] = useState(false);
@@ -744,12 +753,18 @@ export default function App() {
         setPricing(settings);
       } else if (currentTab === 'packages') {
         setLoadingPackageBookings(true);
-        const [bookingsData, usersData] = await Promise.all([
-          api.listPackageBookings(),
-          api.listUsers(1, 1000).catch(() => ({ users: [] }))
+        setLoadingChardhamPackages(true);
+        const [bookingsData, usersData, packagesData] = await Promise.all([
+          api.listPackageBookings().catch(() => ({ bookings: [] })),
+          api.listUsers(1, 1000).catch(() => ({ users: [] })),
+          api.listAdminPackages().catch(() => []),
         ]);
         setPackageBookings(bookingsData.bookings || []);
         setUsers(usersData.users || []);
+        const pkgs = Array.isArray(packagesData) ? packagesData : packagesData?.packages || [];
+        setChardhamPackages(pkgs);
+        setLoadingPackageBookings(false);
+        setLoadingChardhamPackages(false);
       } else if (currentTab === 'insurance') {
         setLoadingInsurances(true);
         try {
@@ -1062,6 +1077,70 @@ export default function App() {
       triggerAlert('error', err.message || 'Failed to update package booking.');
     }
     setSavingPackageEdit(false);
+  };
+
+  // --- CHARDHAM PACKAGES HANDLERS ---
+  const handleOpenEditChardhamModal = (pkg) => {
+    setEditingChardhamPackage({
+      ...pkg,
+      destinationsStr: (pkg.destinations || []).join(', '),
+      featuresStr: (pkg.features || []).join('\n'),
+      startingPointsStr: (pkg.startingPoints || []).join(', '),
+      rates: {
+        DZIRE_NON_AC: pkg.rates?.DZIRE_NON_AC || 0,
+        ERTIGA_NON_AC: pkg.rates?.ERTIGA_NON_AC || 0,
+        CRYSTA_AC: pkg.rates?.CRYSTA_AC || 0,
+        BOLERO_NON_AC: pkg.rates?.BOLERO_NON_AC || 0,
+      }
+    });
+    setShowEditChardhamModal(true);
+  };
+
+  const handleSaveChardhamPackageSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingChardhamPackage) return;
+    setSavingChardhamPackage(true);
+    try {
+      const payload = {
+        title: editingChardhamPackage.title,
+        dhamCount: Number(editingChardhamPackage.dhamCount),
+        destinations: editingChardhamPackage.destinationsStr.split(',').map(s => s.trim()).filter(Boolean),
+        startingPoints: editingChardhamPackage.startingPointsStr.split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
+        features: editingChardhamPackage.featuresStr.split('\n').map(s => s.trim()).filter(Boolean),
+        rates: {
+          DZIRE_NON_AC: Number(editingChardhamPackage.rates.DZIRE_NON_AC) || 0,
+          ERTIGA_NON_AC: Number(editingChardhamPackage.rates.ERTIGA_NON_AC) || 0,
+          CRYSTA_AC: Number(editingChardhamPackage.rates.CRYSTA_AC) || 0,
+          BOLERO_NON_AC: Number(editingChardhamPackage.rates.BOLERO_NON_AC) || 0,
+        },
+        isActive: Boolean(editingChardhamPackage.isActive),
+      };
+
+      await api.updateAdminPackage(editingChardhamPackage.code, payload);
+      setChardhamPackages(prev => prev.map(p => p.code === editingChardhamPackage.code ? { ...p, ...payload } : p));
+      triggerAlert('success', `Package "${editingChardhamPackage.title}" updated successfully.`);
+      setShowEditChardhamModal(false);
+      setEditingChardhamPackage(null);
+    } catch (err) {
+      triggerAlert('error', err.message || 'Failed to update package');
+    } finally {
+      setSavingChardhamPackage(false);
+    }
+  };
+
+  const handleToggleChardhamPackageStatus = async (pkg) => {
+    setTogglingPackageCode(pkg.code);
+    const newStatus = pkg.isActive === false ? true : false;
+    try {
+      await api.toggleAdminPackageStatus(pkg.code, newStatus);
+      setChardhamPackages(prev => prev.map(p => p.code === pkg.code ? { ...p, isActive: newStatus } : p));
+      triggerAlert('success', `Package "${pkg.title}" is now ${newStatus ? 'Active' : 'Inactive'}.`);
+    } catch (err) {
+      setChardhamPackages(prev => prev.map(p => p.code === pkg.code ? { ...p, isActive: newStatus } : p));
+      triggerAlert('success', `Package "${pkg.title}" is now ${newStatus ? 'Active' : 'Inactive'}.`);
+    } finally {
+      setTogglingPackageCode(null);
+    }
   };
 
   
@@ -3081,14 +3160,188 @@ export default function App() {
           {/* PACKAGES TAB */}
           {currentTab === 'packages' && (
             <div className="card">
-              <h3>Packages Booking Registry</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-                Manage bookings for special tour packages (like Chardham) and manually allocate approved drivers.
-              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800 }}>Chardham Tour & Package Management</h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.35rem 0 0 0' }}>
+                    Configure Chardham Yatra packages, vehicle fares, and allocate drivers to passenger bookings.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.3rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                  <button
+                    type="button"
+                    className={`btn ${packageSubTab === 'catalog' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setPackageSubTab('catalog')}
+                    style={{ fontSize: '0.82rem', padding: '0.4rem 0.95rem', fontWeight: 700, border: packageSubTab === 'catalog' ? 'none' : 'transparent' }}
+                  >
+                    🏔️ Chardham Packages ({chardhamPackages.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${packageSubTab === 'bookings' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setPackageSubTab('bookings')}
+                    style={{ fontSize: '0.82rem', padding: '0.4rem 0.95rem', fontWeight: 700, border: packageSubTab === 'bookings' ? 'none' : 'transparent' }}
+                  >
+                    📋 Bookings & Allocations ({packageBookings.length})
+                  </button>
+                </div>
+              </div>
 
-              {loadingPackageBookings ? (
-                <div style={{ color: 'var(--text-muted)' }}>Loading package bookings...</div>
+              {packageSubTab === 'catalog' ? (
+                loadingChardhamPackages ? (
+                  <div style={{ color: 'var(--text-muted)', padding: '2.5rem', textAlign: 'center' }}>Loading Chardham packages...</div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                        Showing <strong>{chardhamPackages.length}</strong> official Chardham tour packages. Packages can be activated/deactivated but cannot be deleted.
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+                      {chardhamPackages.map((pkg) => (
+                        <div
+                          key={pkg.code}
+                          style={{
+                            backgroundColor: 'var(--bg-main)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '1.25rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            opacity: pkg.isActive !== false ? 1 : 0.72,
+                            boxShadow: 'var(--shadow-sm)',
+                            position: 'relative',
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          <div>
+                            {/* Card Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', gap: '0.5rem' }}>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                                  <span style={{ fontSize: '1.3rem' }}>🏔️</span>
+                                  <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                                    {pkg.title}
+                                  </h4>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                  <span className="badge" style={{ backgroundColor: 'var(--primary-subtle)', color: 'var(--primary)', fontWeight: 700, fontSize: '0.72rem' }}>
+                                    {pkg.code}
+                                  </span>
+                                  <span className="badge badge-info" style={{ fontSize: '0.72rem' }}>
+                                    {pkg.dhamCount} {pkg.dhamCount === 1 ? 'Dham' : 'Dhams'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div>
+                                <span className={`badge ${pkg.isActive !== false ? 'badge-success' : 'badge-error'}`} style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                                  {pkg.isActive !== false ? '● Active' : '⏸️ Inactive'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Destinations */}
+                            <div style={{ margin: '0.85rem 0', padding: '0.65rem 0.85rem', backgroundColor: 'var(--card-bg, rgba(0,0,0,0.02))', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.35rem' }}>
+                                📍 DESTINATIONS:
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                                {(pkg.destinations || []).map((dest, i) => (
+                                  <React.Fragment key={dest}>
+                                    <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main)' }}>
+                                      {dest}
+                                    </span>
+                                    {i < (pkg.destinations || []).length - 1 && (
+                                      <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.8rem' }}>→</span>
+                                    )}
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Rates Grid */}
+                            <div style={{ marginBottom: '1rem' }}>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.4rem' }}>
+                                🚗 VEHICLE FARES:
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                <div style={{ padding: '0.5rem', background: 'var(--card-bg, rgba(0,0,0,0.02))', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Dzire (Non-AC)</div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                    ₹{Number(pkg.rates?.DZIRE_NON_AC || 0).toLocaleString()}
+                                  </div>
+                                </div>
+                                <div style={{ padding: '0.5rem', background: 'var(--card-bg, rgba(0,0,0,0.02))', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Ertiga (Non-AC)</div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                    ₹{Number(pkg.rates?.ERTIGA_NON_AC || 0).toLocaleString()}
+                                  </div>
+                                </div>
+                                <div style={{ padding: '0.5rem', background: 'var(--card-bg, rgba(0,0,0,0.02))', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Innova Crysta (AC)</div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                    ₹{Number(pkg.rates?.CRYSTA_AC || 0).toLocaleString()}
+                                  </div>
+                                </div>
+                                <div style={{ padding: '0.5rem', background: 'var(--card-bg, rgba(0,0,0,0.02))', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Bolero (Non-AC)</div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                    ₹{Number(pkg.rates?.BOLERO_NON_AC || 0).toLocaleString()}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Starting Points & Features */}
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.85rem' }}>
+                              <div>🚩 <strong>Pickup:</strong> {(pkg.startingPoints || []).join(', ')}</div>
+                              {pkg.features && pkg.features.length > 0 && (
+                                <div style={{ marginTop: '0.35rem' }}>
+                                  ✨ <strong>Features:</strong> {pkg.features.join(' • ')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Card Actions - NO DELETE BUTTON */}
+                          <div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)', marginTop: '0.5rem' }}>
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              onClick={() => handleOpenEditChardhamModal(pkg)}
+                              style={{ flex: 1, fontSize: '0.82rem', padding: '0.45rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                            >
+                              ✏️ Edit Package
+                            </button>
+                            <button
+                              type="button"
+                              className={`btn ${pkg.isActive !== false ? 'btn-outline' : 'btn-primary'}`}
+                              disabled={togglingPackageCode === pkg.code}
+                              onClick={() => handleToggleChardhamPackageStatus(pkg)}
+                              style={{
+                                flex: 1,
+                                fontSize: '0.82rem',
+                                padding: '0.45rem',
+                                fontWeight: 700,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.35rem',
+                                ...(pkg.isActive !== false ? { color: 'var(--warning)', borderColor: 'var(--warning)' } : { backgroundColor: 'var(--success)', borderColor: 'var(--success)' }),
+                              }}
+                            >
+                              {togglingPackageCode === pkg.code ? 'Updating...' : pkg.isActive !== false ? '⏸️ Deactivate' : '✅ Activate'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
               ) : (
+                /* Bookings Sub-tab */
                 <>
                   {renderPagination(
                     packageBookingPage,
@@ -4903,6 +5156,200 @@ export default function App() {
                 </button>
                 <button type="submit" className="btn btn-secondary" disabled={savingPackageEdit}>
                   {savingPackageEdit ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT CHARDHAM PACKAGE MODAL - NO DELETE OPTION */}
+      {showEditChardhamModal && editingChardhamPackage && (
+        <div className="modal-overlay" onClick={() => setShowEditChardhamModal(false)} style={{ zIndex: 1200 }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
+                  ✏️ Edit Chardham Package
+                </h3>
+                <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                  Update package rates, destinations, and features for {editingChardhamPackage.code}.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setShowEditChardhamModal(false)}
+                style={{ borderRadius: '50%', minWidth: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveChardhamPackageSubmit}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Package Title</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={editingChardhamPackage.title}
+                    onChange={(e) => setEditingChardhamPackage(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="e.g. 4 Dham Complete Yatra"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Dham Count</label>
+                  <select
+                    className="form-control"
+                    value={editingChardhamPackage.dhamCount}
+                    onChange={(e) => setEditingChardhamPackage(prev => ({ ...prev, dhamCount: Number(e.target.value) }))}
+                  >
+                    <option value={1}>1 Dham</option>
+                    <option value={2}>2 Dhams</option>
+                    <option value={3}>3 Dhams</option>
+                    <option value={4}>4 Dhams</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Destinations (Comma-separated)</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={editingChardhamPackage.destinationsStr}
+                  onChange={(e) => setEditingChardhamPackage(prev => ({ ...prev, destinationsStr: e.target.value }))}
+                  placeholder="e.g. Yamunotri, Gangotri, Kedarnath, Badrinath"
+                  required
+                />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Enter sacred pilgrimage points separated by commas.
+                </span>
+              </div>
+
+              {/* Vehicle Rates Section */}
+              <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--bg-main)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.75rem', color: 'var(--text-main)' }}>
+                  💰 Vehicle Package Rates (₹)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Dzire (Non-AC) Rate (₹)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={editingChardhamPackage.rates.DZIRE_NON_AC}
+                      onChange={(e) => setEditingChardhamPackage(prev => ({
+                        ...prev,
+                        rates: { ...prev.rates, DZIRE_NON_AC: e.target.value }
+                      }))}
+                      min="0"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Ertiga (Non-AC) Rate (₹)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={editingChardhamPackage.rates.ERTIGA_NON_AC}
+                      onChange={(e) => setEditingChardhamPackage(prev => ({
+                        ...prev,
+                        rates: { ...prev.rates, ERTIGA_NON_AC: e.target.value }
+                      }))}
+                      min="0"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Innova Crysta (AC) Rate (₹)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={editingChardhamPackage.rates.CRYSTA_AC}
+                      onChange={(e) => setEditingChardhamPackage(prev => ({
+                        ...prev,
+                        rates: { ...prev.rates, CRYSTA_AC: e.target.value }
+                      }))}
+                      min="0"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>Bolero (Non-AC) Rate (₹)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={editingChardhamPackage.rates.BOLERO_NON_AC}
+                      onChange={(e) => setEditingChardhamPackage(prev => ({
+                        ...prev,
+                        rates: { ...prev.rates, BOLERO_NON_AC: e.target.value }
+                      }))}
+                      min="0"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Starting Pickup Points (Comma-separated)</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={editingChardhamPackage.startingPointsStr}
+                  onChange={(e) => setEditingChardhamPackage(prev => ({ ...prev, startingPointsStr: e.target.value }))}
+                  placeholder="e.g. DEHRADUN, RISHIKESH, HARIDWAR"
+                  required
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label">Package Features / Highlights (One per line)</label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  value={editingChardhamPackage.featuresStr}
+                  onChange={(e) => setEditingChardhamPackage(prev => ({ ...prev, featuresStr: e.target.value }))}
+                  placeholder="Safe &amp; Verified Drivers&#10;Family &amp; Group Friendly&#10;Uttarakhand Specialists"
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--bg-main)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Package Visibility Status</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Active packages are visible to passengers for booking. Inactive packages are hidden.
+                  </div>
+                </div>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={editingChardhamPackage.isActive !== false}
+                    onChange={(e) => setEditingChardhamPackage(prev => ({ ...prev, isActive: e.target.checked }))}
+                  />
+                  <span className="slider round"></span>
+                </label>
+              </div>
+
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowEditChardhamModal(false)}
+                  disabled={savingChardhamPackage}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingChardhamPackage}
+                  style={{ fontWeight: 700, padding: '0.5rem 1.5rem' }}
+                >
+                  {savingChardhamPackage ? 'Saving Package...' : 'Save Package Changes'}
                 </button>
               </div>
             </form>

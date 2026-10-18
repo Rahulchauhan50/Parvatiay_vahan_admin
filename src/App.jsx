@@ -1419,10 +1419,19 @@ export default function App() {
     if (userRoleFilter !== 'ALL' && !u.roles?.includes(userRoleFilter)) {
       return false;
     }
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return true;
+    const cleanQ = q.replace(/[\s-]/g, '');
+
+    const vehicleReg = u.vehicle?.registrationNumber ? String(u.vehicle.registrationNumber).toLowerCase() : '';
+    const cleanVehicleReg = vehicleReg.replace(/[\s-]/g, '');
+    const vehicleMatch = Boolean(vehicleReg && (vehicleReg.includes(q) || (cleanQ && cleanVehicleReg.includes(cleanQ))));
+
     return (
-      u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.mobile?.includes(userSearch) ||
-      u.email?.toLowerCase().includes(userSearch.toLowerCase())
+      u.name?.toLowerCase().includes(q) ||
+      u.mobile?.includes(userSearch.trim()) ||
+      u.email?.toLowerCase().includes(q) ||
+      vehicleMatch
     );
   });
 
@@ -2406,7 +2415,7 @@ export default function App() {
                     </span>
                     <input 
                       type="text" 
-                      placeholder="Search by name, email or phone..." 
+                      placeholder="Search by name, email, phone or car number..." 
                       className="form-control"
                       style={{ width: '320px', paddingLeft: '44px' }}
                       value={userSearch}

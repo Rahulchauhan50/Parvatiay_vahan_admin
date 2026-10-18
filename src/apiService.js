@@ -472,3 +472,44 @@ export const adminCancelPackageBooking = async (bookingId, reason) => {
   if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to cancel package booking');
   return data.data || data;
 };
+
+// --- VEHICLE APPROVALS API ---
+export const listAdminVehicles = async (status = '', page = 1, limit = 50) => {
+  const query = new URLSearchParams();
+  if (status && status !== 'ALL') query.append('status', status);
+  query.append('page', page);
+  query.append('limit', limit);
+  const res = await fetch(`${BASE_URL}/admin/vehicles?${query.toString()}`, {
+    headers: { Authorization: `Bearer ${getToken()}` }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || data.error?.message || 'Failed to list vehicles');
+  return data;
+};
+
+export const approveAdminVehicle = async (vehicleId) => {
+  const res = await fetch(`${BASE_URL}/admin/vehicles/${vehicleId}/approve`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || data.error?.message || 'Failed to approve vehicle');
+  return data;
+};
+
+export const rejectAdminVehicle = async (vehicleId, rejectionReason) => {
+  const res = await fetch(`${BASE_URL}/admin/vehicles/${vehicleId}/reject`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ rejectionReason })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || data.error?.message || 'Failed to reject vehicle');
+  return data;
+};

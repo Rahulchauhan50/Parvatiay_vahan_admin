@@ -347,6 +347,14 @@ export default function App() {
   // --- PACKAGE BOOKING DETAILS & EDIT STATE ---
   const [selectedPackageDetails, setSelectedPackageDetails] = useState(null);
   const [driverInsurances, setDriverInsurances] = useState([]);
+  // --- VEHICLE APPROVALS STATE ---
+  const [adminVehicles, setAdminVehicles] = useState([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [vehicleStatusFilter, setVehicleStatusFilter] = useState('ALL');
+  const [rejectVehicleTarget, setRejectVehicleTarget] = useState(null);
+  const [vehicleRejectReason, setVehicleRejectReason] = useState('');
+  const [showVehicleRejectModal, setShowVehicleRejectModal] = useState(false);
+  const [processingVehicleAction, setProcessingVehicleAction] = useState(false);
   const [loadingInsurances, setLoadingInsurances] = useState(false);
   const [insuranceFilter, setInsuranceFilter] = useState('ALL');
   const [insuranceSearch, setInsuranceSearch] = useState('');
@@ -765,6 +773,8 @@ export default function App() {
         setChardhamPackages(pkgs);
         setLoadingPackageBookings(false);
         setLoadingChardhamPackages(false);
+      } else if (currentTab === 'vehicles') {
+        loadAdminVehicles();
       } else if (currentTab === 'insurance') {
         setLoadingInsurances(true);
         try {
@@ -943,6 +953,51 @@ export default function App() {
       triggerAlert('warning', 'Document rejected.');
     } catch (err) {
       triggerAlert('error', 'Failed to reject document.');
+    }
+  };
+
+  const loadAdminVehicles = async (status = vehicleStatusFilter) => {
+    setLoadingVehicles(true);
+    try {
+      const data = await api.listAdminVehicles(status === 'ALL' ? '' : status);
+      setAdminVehicles(data.vehicles || []);
+    } catch (err) {
+      triggerAlert('error', err.message || 'Failed to load vehicles');
+    } finally {
+      setLoadingVehicles(false);
+    }
+  };
+
+  const handleApproveVehicle = async (vehicleId) => {
+    setProcessingVehicleAction(true);
+    try {
+      await api.approveAdminVehicle(vehicleId);
+      triggerAlert('success', 'Vehicle approved successfully! It is now active for rides.');
+      loadAdminVehicles();
+    } catch (err) {
+      triggerAlert('error', err.message || 'Failed to approve vehicle');
+    } finally {
+      setProcessingVehicleAction(false);
+    }
+  };
+
+  const handleRejectVehicle = async () => {
+    if (!rejectVehicleTarget || !vehicleRejectReason.trim()) {
+      triggerAlert('error', 'Please provide a reason for rejecting the vehicle');
+      return;
+    }
+    setProcessingVehicleAction(true);
+    try {
+      await api.rejectAdminVehicle(rejectVehicleTarget._id || rejectVehicleTarget.id, vehicleRejectReason.trim());
+      triggerAlert('warning', 'Vehicle rejected.');
+      setShowVehicleRejectModal(false);
+      setRejectVehicleTarget(null);
+      setVehicleRejectReason('');
+      loadAdminVehicles();
+    } catch (err) {
+      triggerAlert('error', err.message || 'Failed to reject vehicle');
+    } finally {
+      setProcessingVehicleAction(false);
     }
   };
 
@@ -3585,7 +3640,262 @@ export default function App() {
 
           
           {/* LEGAL & POLICIES CMS TAB */}
-          {currentTab === 'insurance' && (() => {
+          {currentTab === 'vehicles' && (
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ margin: 0 }}>Vehicle Approvals & Registry</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.25rem 0 0 0' }}>
+                  Review, approve or reject vehicles added by drivers. Only approved vehicles become visible and eligible for offering rides.
+                </p>
+              </div>
+              <button
+                onClick={() => loadAdminVehicles()}
+                className="btn btn-outline"
+                title="Refresh Vehicles"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+
+            {/* Filter pills */}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+              {[
+                { key: 'ALL', label: 'All Vehicles', count: adminVehicles.length },
+                { key: 'PENDING', label: 'Pending Approval', count: adminVehicles.filter(v => (v.status || 'PENDING') === 'PENDING').length, color: '#f59e0b' },
+                { key: 'APPROVED', label: 'Approved', count: adminVehicles.filter(v => v.status === 'APPROVED').length, color: '#16a34a' },
+                { key: 'REJECTED', label: 'Rejected', count: adminVehicles.filter(v => v.status === 'REJECTED').length, color: '#dc2626' },
+              ].map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => {
+                    setVehicleStatusFilter(p.key);
+                    loadAdminVehicles(p.key);
+                  }}
+                  style={{
+                    padding: '0.45rem 0.9rem',
+                    borderRadius: '20px',
+                    border: vehicleStatusFilter === p.key ? '2px solid var(--primary)' : '1px solid var(--border)',
+                    background: vehicleStatusFilter === p.key ? 'rgba(249, 115, 22, 0.1)' : 'var(--bg-main)',
+                    color: vehicleStatusFilter === p.key ? 'var(--primary)' : 'var(--text-main)',
+                    fontWeight: vehicleStatusFilter === p.key ? 700 : 500,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <span>{p.label}</span>
+                  <span style={{
+                    background: p.color ? p.color : 'var(--border)',
+                    color: '#fff',
+                    padding: '1px 6px',
+                    borderRadius: '10px',
+                    fontSize: '0.7rem',
+                  }}>
+                    {p.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Table */}
+            {loadingVehicles ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading vehicles...</div>
+            ) : adminVehicles.length === 0 ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                No vehicles found for the selected filter.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border)', background: 'var(--bg-main)' }}>
+                      <th style={{ padding: '0.75rem' }}>Vehicle</th>
+                      <th style={{ padding: '0.75rem' }}>Reg Number</th>
+                      <th style={{ padding: '0.75rem' }}>Owner / Driver</th>
+                      <th style={{ padding: '0.75rem' }}>Capacity & Specs</th>
+                      <th style={{ padding: '0.75rem' }}>Insurance Expiry</th>
+                      <th style={{ padding: '0.75rem' }}>Status</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminVehicles.map(veh => {
+                      const vehStatus = veh.status || 'PENDING';
+                      const ownerName = veh.userId?.name || veh.driverName || 'Driver';
+                      const ownerMobile = veh.userId?.mobile || veh.driverMobile || 'N/A';
+                      const insDate = veh.insuranceExpiryDate ? new Date(veh.insuranceExpiryDate).toLocaleDateString('en-IN') : 'Not Set';
+
+                      return (
+                        <tr key={veh._id || veh.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '0.75rem' }}>
+                            <div style={{ fontWeight: 600 }}>{veh.make} {veh.model}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{veh.color || 'Color N/A'} {veh.year ? `• ${veh.year}` : ''}</div>
+                          </td>
+                          <td style={{ padding: '0.75rem' }}>
+                            <span style={{ fontWeight: 700, fontFamily: 'monospace', background: 'rgba(0,0,0,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+                              {veh.registrationNumber}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.75rem' }}>
+                            <div style={{ fontWeight: 500 }}>{ownerName}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{ownerMobile}</div>
+                          </td>
+                          <td style={{ padding: '0.75rem', fontSize: '0.85rem' }}>
+                            <div>Seats: <strong>{veh.seatCapacity || 4}</strong></div>
+                            <div style={{ color: 'var(--text-muted)' }}>Fuel: {veh.fuelType || 'Petrol/Diesel'}</div>
+                          </td>
+                          <td style={{ padding: '0.75rem', fontSize: '0.85rem' }}>
+                            <div>{insDate}</div>
+                          </td>
+                          <td style={{ padding: '0.75rem' }}>
+                            <span style={{
+                              padding: '3px 8px',
+                              borderRadius: '12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              background: vehStatus === 'APPROVED' ? '#dcfce7' : vehStatus === 'REJECTED' ? '#fee2e2' : '#fef3c7',
+                              color: vehStatus === 'APPROVED' ? '#166534' : vehStatus === 'REJECTED' ? '#991b1b' : '#92400e',
+                            }}>
+                              {vehStatus === 'APPROVED' ? '✓ APPROVED' : vehStatus === 'REJECTED' ? '✕ REJECTED' : '⏳ PENDING'}
+                            </span>
+                            {veh.rejectionReason && (
+                              <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '4px', maxWidth: '160px' }}>
+                                Reason: {veh.rejectionReason}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                              {vehStatus !== 'APPROVED' && (
+                                <button
+                                  onClick={() => handleApproveVehicle(veh._id || veh.id)}
+                                  disabled={processingVehicleAction}
+                                  style={{
+                                    padding: '0.35rem 0.75rem',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    background: '#16a34a',
+                                    color: '#fff',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Approve Vehicle"
+                                >
+                                  ✓ Approve
+                                </button>
+                              )}
+                              {vehStatus !== 'REJECTED' && (
+                                <button
+                                  onClick={() => {
+                                    setRejectVehicleTarget(veh);
+                                    setVehicleRejectReason('');
+                                    setShowVehicleRejectModal(true);
+                                  }}
+                                  disabled={processingVehicleAction}
+                                  style={{
+                                    padding: '0.35rem 0.75rem',
+                                    borderRadius: '6px',
+                                    border: '1px solid #dc2626',
+                                    background: '#fff',
+                                    color: '#dc2626',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Reject Vehicle"
+                                >
+                                  ✕ Reject
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Vehicle Reject Modal */}
+            {showVehicleRejectModal && (
+              <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 9999,
+              }}>
+                <div style={{
+                  background: '#fff',
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  maxWidth: '460px',
+                  width: '90%',
+                  boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
+                }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#dc2626' }}>Reject Vehicle Details</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 1rem 0' }}>
+                    Please provide a clear reason why vehicle {rejectVehicleTarget?.registrationNumber} ({rejectVehicleTarget?.make} {rejectVehicleTarget?.model}) is being rejected. The driver will be instructed to correct it.
+                  </p>
+                  <textarea
+                    rows={4}
+                    value={vehicleRejectReason}
+                    onChange={(e) => setVehicleRejectReason(e.target.value)}
+                    placeholder="E.g., RC registration number does not match uploaded documents / Invalid model details..."
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      fontSize: '0.9rem',
+                      boxSizing: 'border-box',
+                      marginBottom: '1rem',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => {
+                        setShowVehicleRejectModal(false);
+                        setRejectVehicleTarget(null);
+                        setVehicleRejectReason('');
+                      }}
+                      className="btn btn-outline"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleRejectVehicle}
+                      disabled={processingVehicleAction || !vehicleRejectReason.trim()}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: '#dc2626',
+                        color: '#fff',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {processingVehicleAction ? 'Rejecting...' : 'Confirm Reject'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {currentTab === 'insurance' && (() => {
             const activeDriverInsurances = driverInsurances.filter(d => {
               if (!d.driverId) return false;
               if (d.accountStatus === 'DELETED') return false;

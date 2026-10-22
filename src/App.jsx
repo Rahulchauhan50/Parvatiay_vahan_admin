@@ -286,8 +286,36 @@ function DocumentPreviewModal({ modal, onClose }) {
   );
 }
 
+const VALID_TABS = [
+  'dashboard',
+  'users',
+  'drivers',
+  'vehicles',
+  'rides',
+  'bookings',
+  'pricing',
+  'packages',
+  'locations',
+  'insurance',
+  'policies',
+];
+
+const getInitialTab = () => {
+  try {
+    const hash = window.location.hash.replace(/^#[/]*/, '').toLowerCase();
+    if (hash && VALID_TABS.includes(hash)) {
+      return hash;
+    }
+    const saved = localStorage.getItem('admin_current_tab');
+    if (saved && VALID_TABS.includes(saved)) {
+      return saved;
+    }
+  } catch (_) {}
+  return 'dashboard';
+};
+
 export default function App() {
-  const [currentTab, setCurrentTab] = useState('dashboard');
+  const [currentTab, setCurrentTab] = useState(getInitialTab);
   const [theme, setTheme] = useState('light');
   const useMock = false;
   const [backendOnline, setBackendOnline] = useState(false);
@@ -578,6 +606,12 @@ export default function App() {
 
   const navigateToTab = (tab) => {
     setCurrentTab(tab);
+    try {
+      localStorage.setItem('admin_current_tab', tab);
+      if (window.location.hash.replace(/^#[/]*/, '').toLowerCase() !== tab) {
+        window.history.replaceState(null, '', '#' + tab);
+      }
+    } catch (_) {}
     setUserPage(1);
     setDriverAppPage(1);
     setRidePage(1);
@@ -706,7 +740,36 @@ export default function App() {
     setOtpSent(false);
     setLoginMobile('+91');
     setLoginOtp('');
+    try {
+      localStorage.removeItem('admin_current_tab');
+      window.history.replaceState(null, '', window.location.pathname);
+    } catch (_) {}
   };
+
+  // Sync tab with URL hash and localStorage
+  useEffect(() => {
+    if (VALID_TABS.includes(currentTab)) {
+      try {
+        localStorage.setItem('admin_current_tab', currentTab);
+        if (window.location.hash.replace(/^#[/]*/, '').toLowerCase() !== currentTab) {
+          window.history.replaceState(null, '', '#' + currentTab);
+        }
+      } catch (_) {}
+    }
+  }, [currentTab]);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      try {
+        const hash = window.location.hash.replace(/^#[/]*/, '').toLowerCase();
+        if (hash && VALID_TABS.includes(hash) && hash !== currentTab) {
+          navigateToTab(hash);
+        }
+      } catch (_) {}
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [currentTab]);
 
   // Theme effect
   useEffect(() => {

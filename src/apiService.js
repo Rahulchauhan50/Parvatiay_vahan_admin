@@ -474,7 +474,7 @@ export const adminCancelPackageBooking = async (bookingId, reason) => {
 };
 
 // --- VEHICLE APPROVALS API ---
-export const listAdminVehicles = async (status = '', page = 1, limit = 50) => {
+export const listAdminVehicles = async (status = '', page = 1, limit = 200) => {
   const query = new URLSearchParams();
   if (status && status !== 'ALL') query.append('status', status);
   query.append('page', page);
@@ -484,7 +484,7 @@ export const listAdminVehicles = async (status = '', page = 1, limit = 50) => {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || data.error?.message || 'Failed to list vehicles');
-  return data;
+  return data.data?.vehicles || data.vehicles || data.data || data;
 };
 
 export const approveAdminVehicle = async (vehicleId) => {
@@ -497,7 +497,7 @@ export const approveAdminVehicle = async (vehicleId) => {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || data.error?.message || 'Failed to approve vehicle');
-  return data;
+  return data.data || data;
 };
 
 export const rejectAdminVehicle = async (vehicleId, rejectionReason) => {
@@ -511,5 +511,5 @@ export const rejectAdminVehicle = async (vehicleId, rejectionReason) => {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || data.error?.message || 'Failed to reject vehicle');
-  return data;
+  return data.data || data;
 };

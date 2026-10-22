@@ -351,6 +351,7 @@ export default function App() {
   const [adminVehicles, setAdminVehicles] = useState([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [vehicleStatusFilter, setVehicleStatusFilter] = useState('ALL');
+  const [vehicleSearch, setVehicleSearch] = useState('');
   const [rejectVehicleTarget, setRejectVehicleTarget] = useState(null);
   const [vehicleRejectReason, setVehicleRejectReason] = useState('');
   const [showVehicleRejectModal, setShowVehicleRejectModal] = useState(false);
@@ -956,11 +957,14 @@ export default function App() {
     }
   };
 
-  const loadAdminVehicles = async (status = vehicleStatusFilter) => {
+  const loadAdminVehicles = async () => {
     setLoadingVehicles(true);
     try {
-      const data = await api.listAdminVehicles(status === 'ALL' ? '' : status);
-      setAdminVehicles(data.vehicles || []);
+      const data = await api.listAdminVehicles('ALL');
+      const list = Array.isArray(data)
+        ? data
+        : (data?.vehicles || data?.data?.vehicles || data?.data || []);
+      setAdminVehicles(list);
     } catch (err) {
       triggerAlert('error', err.message || 'Failed to load vehicles');
     } finally {
@@ -3670,168 +3674,211 @@ export default function App() {
               </button>
             </div>
 
-            {/* Filter pills */}
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
-              {[
-                { key: 'ALL', label: 'All Vehicles', count: adminVehicles.length },
-                { key: 'PENDING', label: 'Pending Approval', count: adminVehicles.filter(v => (v.status || 'PENDING') === 'PENDING').length, color: '#f59e0b' },
-                { key: 'APPROVED', label: 'Approved', count: adminVehicles.filter(v => v.status === 'APPROVED').length, color: '#16a34a' },
-                { key: 'REJECTED', label: 'Rejected', count: adminVehicles.filter(v => v.status === 'REJECTED').length, color: '#dc2626' },
-              ].map(p => (
-                <button
-                  key={p.key}
-                  onClick={() => {
-                    setVehicleStatusFilter(p.key);
-                    loadAdminVehicles(p.key);
-                  }}
-                  style={{
-                    padding: '0.45rem 0.9rem',
-                    borderRadius: '20px',
-                    border: vehicleStatusFilter === p.key ? '2px solid var(--primary)' : '1px solid var(--border)',
-                    background: vehicleStatusFilter === p.key ? 'rgba(249, 115, 22, 0.1)' : 'var(--bg-main)',
-                    color: vehicleStatusFilter === p.key ? 'var(--primary)' : 'var(--text-main)',
-                    fontWeight: vehicleStatusFilter === p.key ? 700 : 500,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem'
-                  }}
-                >
-                  <span>{p.label}</span>
-                  <span style={{
-                    background: p.color ? p.color : 'var(--border)',
-                    color: '#fff',
-                    padding: '1px 6px',
-                    borderRadius: '10px',
-                    fontSize: '0.7rem',
-                  }}>
-                    {p.count}
-                  </span>
-                </button>
-              ))}
+            {/* Filter pills and Search bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                {[
+                  { key: 'ALL', label: 'All Vehicles', count: adminVehicles.length },
+                  { key: 'PENDING', label: 'Pending Approval', count: adminVehicles.filter(v => (v.status || 'PENDING') === 'PENDING').length, color: '#f59e0b' },
+                  { key: 'APPROVED', label: 'Approved', count: adminVehicles.filter(v => v.status === 'APPROVED').length, color: '#16a34a' },
+                  { key: 'REJECTED', label: 'Rejected', count: adminVehicles.filter(v => v.status === 'REJECTED').length, color: '#dc2626' },
+                ].map(p => (
+                  <button
+                    key={p.key}
+                    onClick={() => setVehicleStatusFilter(p.key)}
+                    style={{
+                      padding: '0.45rem 0.9rem',
+                      borderRadius: '20px',
+                      border: vehicleStatusFilter === p.key ? '2px solid var(--primary)' : '1px solid var(--border)',
+                      background: vehicleStatusFilter === p.key ? 'rgba(249, 115, 22, 0.1)' : 'var(--bg-main)',
+                      color: vehicleStatusFilter === p.key ? 'var(--primary)' : 'var(--text-main)',
+                      fontWeight: vehicleStatusFilter === p.key ? 700 : 500,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}
+                  >
+                    <span>{p.label}</span>
+                    <span style={{
+                      background: p.color ? p.color : 'var(--border)',
+                      color: '#fff',
+                      padding: '1px 6px',
+                      borderRadius: '10px',
+                      fontSize: '0.7rem',
+                    }}>
+                      {p.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Search bar */}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <span style={{ position: 'absolute', left: '14px', display: 'flex' }}>
+                  <Icons.Search />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search by reg no, make, driver..."
+                  className="form-control"
+                  style={{ width: '280px', paddingLeft: '38px', fontSize: '0.82rem' }}
+                  value={vehicleSearch}
+                  onChange={(e) => setVehicleSearch(e.target.value)}
+                />
+              </div>
             </div>
 
             {/* Table */}
-            {loadingVehicles ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading vehicles...</div>
-            ) : adminVehicles.length === 0 ? (
-              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                No vehicles found for the selected filter.
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border)', background: 'var(--bg-main)' }}>
-                      <th style={{ padding: '0.75rem' }}>Vehicle</th>
-                      <th style={{ padding: '0.75rem' }}>Reg Number</th>
-                      <th style={{ padding: '0.75rem' }}>Owner / Driver</th>
-                      <th style={{ padding: '0.75rem' }}>Capacity & Specs</th>
-                      <th style={{ padding: '0.75rem' }}>Insurance Expiry</th>
-                      <th style={{ padding: '0.75rem' }}>Status</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {adminVehicles.map(veh => {
-                      const vehStatus = veh.status || 'PENDING';
-                      const ownerName = veh.userId?.name || veh.driverName || 'Driver';
-                      const ownerMobile = veh.userId?.mobile || veh.driverMobile || 'N/A';
-                      const insDate = veh.insuranceExpiryDate ? new Date(veh.insuranceExpiryDate).toLocaleDateString('en-IN') : 'Not Set';
+            {(() => {
+              const filteredList = adminVehicles.filter(veh => {
+                const vehStatus = veh.status || 'PENDING';
+                if (vehicleStatusFilter !== 'ALL' && vehStatus !== vehicleStatusFilter) {
+                  return false;
+                }
+                if (!vehicleSearch.trim()) return true;
+                const q = vehicleSearch.trim().toLowerCase();
+                const cleanQ = q.replace(/[\s-]/g, '');
+                const reg = (veh.registrationNumber || '').toLowerCase();
+                const cleanReg = reg.replace(/[\s-]/g, '');
+                const ownerName = (veh.user?.name || veh.userId?.name || veh.driverName || '').toLowerCase();
+                const ownerMobile = (veh.user?.mobile || veh.userId?.mobile || veh.driverMobile || '');
+                const makeModel = `${veh.make || ''} ${veh.model || ''}`.toLowerCase();
 
-                      return (
-                        <tr key={veh._id || veh.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '0.75rem' }}>
-                            <div style={{ fontWeight: 600 }}>{veh.make} {veh.model}</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{veh.color || 'Color N/A'} {veh.year ? `• ${veh.year}` : ''}</div>
-                          </td>
-                          <td style={{ padding: '0.75rem' }}>
-                            <span style={{ fontWeight: 700, fontFamily: 'monospace', background: 'rgba(0,0,0,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
-                              {veh.registrationNumber}
-                            </span>
-                          </td>
-                          <td style={{ padding: '0.75rem' }}>
-                            <div style={{ fontWeight: 500 }}>{ownerName}</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{ownerMobile}</div>
-                          </td>
-                          <td style={{ padding: '0.75rem', fontSize: '0.85rem' }}>
-                            <div>Seats: <strong>{veh.seatCapacity || 4}</strong></div>
-                            <div style={{ color: 'var(--text-muted)' }}>Fuel: {veh.fuelType || 'Petrol/Diesel'}</div>
-                          </td>
-                          <td style={{ padding: '0.75rem', fontSize: '0.85rem' }}>
-                            <div>{insDate}</div>
-                          </td>
-                          <td style={{ padding: '0.75rem' }}>
-                            <span style={{
-                              padding: '3px 8px',
-                              borderRadius: '12px',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              background: vehStatus === 'APPROVED' ? '#dcfce7' : vehStatus === 'REJECTED' ? '#fee2e2' : '#fef3c7',
-                              color: vehStatus === 'APPROVED' ? '#166534' : vehStatus === 'REJECTED' ? '#991b1b' : '#92400e',
-                            }}>
-                              {vehStatus === 'APPROVED' ? '✓ APPROVED' : vehStatus === 'REJECTED' ? '✕ REJECTED' : '⏳ PENDING'}
-                            </span>
-                            {veh.rejectionReason && (
-                              <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '4px', maxWidth: '160px' }}>
-                                Reason: {veh.rejectionReason}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                              {vehStatus !== 'APPROVED' && (
-                                <button
-                                  onClick={() => handleApproveVehicle(veh._id || veh.id)}
-                                  disabled={processingVehicleAction}
-                                  style={{
-                                    padding: '0.35rem 0.75rem',
-                                    borderRadius: '6px',
-                                    border: 'none',
-                                    background: '#16a34a',
-                                    color: '#fff',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 600,
-                                    cursor: 'pointer'
-                                  }}
-                                  title="Approve Vehicle"
-                                >
-                                  ✓ Approve
-                                </button>
-                              )}
-                              {vehStatus !== 'REJECTED' && (
-                                <button
-                                  onClick={() => {
-                                    setRejectVehicleTarget(veh);
-                                    setVehicleRejectReason('');
-                                    setShowVehicleRejectModal(true);
-                                  }}
-                                  disabled={processingVehicleAction}
-                                  style={{
-                                    padding: '0.35rem 0.75rem',
-                                    borderRadius: '6px',
-                                    border: '1px solid #dc2626',
-                                    background: '#fff',
-                                    color: '#dc2626',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 600,
-                                    cursor: 'pointer'
-                                  }}
-                                  title="Reject Vehicle"
-                                >
-                                  ✕ Reject
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                return (
+                  reg.includes(q) ||
+                  (cleanReg && cleanQ && cleanReg.includes(cleanQ)) ||
+                  ownerName.includes(q) ||
+                  ownerMobile.includes(q) ||
+                  makeModel.includes(q)
+                );
+              });
+
+              return (
+                <>
+                  {loadingVehicles ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading vehicles...</div>
+                  ) : filteredList.length === 0 ? (
+                    <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No vehicles found for the selected filter.
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border)', background: 'var(--bg-main)' }}>
+                            <th style={{ padding: '0.75rem' }}>Vehicle</th>
+                            <th style={{ padding: '0.75rem' }}>Reg Number</th>
+                            <th style={{ padding: '0.75rem' }}>Owner / Driver</th>
+                            <th style={{ padding: '0.75rem' }}>Capacity & Specs</th>
+                            <th style={{ padding: '0.75rem' }}>Insurance Expiry</th>
+                            <th style={{ padding: '0.75rem' }}>Status</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'right' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredList.map(veh => {
+                            const vehStatus = veh.status || 'PENDING';
+                            const ownerName = veh.user?.name || veh.userId?.name || veh.driverName || 'Driver';
+                            const ownerMobile = veh.user?.mobile || veh.userId?.mobile || veh.driverMobile || 'N/A';
+                            const insDate = veh.insuranceExpiryDate ? new Date(veh.insuranceExpiryDate).toLocaleDateString('en-IN') : 'Not Set';
+
+                            return (
+                              <tr key={veh._id || veh.id || veh.vehicleId} style={{ borderBottom: '1px solid var(--border)' }}>
+                                <td style={{ padding: '0.75rem' }}>
+                                  <div style={{ fontWeight: 600 }}>{veh.make} {veh.model}</div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{veh.color || 'Color N/A'} {veh.year ? `• ${veh.year}` : ''}</div>
+                                </td>
+                                <td style={{ padding: '0.75rem' }}>
+                                  <span style={{ fontWeight: 700, fontFamily: 'monospace', background: 'rgba(0,0,0,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+                                    {veh.registrationNumber}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.75rem' }}>
+                                  <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{ownerName}</div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{ownerMobile}</div>
+                                </td>
+                                <td style={{ padding: '0.75rem', fontSize: '0.85rem' }}>
+                                  <div>Seats: <strong>{veh.seatCapacity || 4}</strong></div>
+                                  <div style={{ color: 'var(--text-muted)' }}>Fuel: {veh.fuelType || 'Petrol/Diesel'}</div>
+                                </td>
+                                <td style={{ padding: '0.75rem', fontSize: '0.85rem' }}>
+                                  <div>{insDate}</div>
+                                </td>
+                                <td style={{ padding: '0.75rem' }}>
+                                  <span style={{
+                                    padding: '3px 8px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    background: vehStatus === 'APPROVED' ? '#dcfce7' : vehStatus === 'REJECTED' ? '#fee2e2' : '#fef3c7',
+                                    color: vehStatus === 'APPROVED' ? '#166534' : vehStatus === 'REJECTED' ? '#991b1b' : '#92400e',
+                                  }}>
+                                    {vehStatus === 'APPROVED' ? '✓ APPROVED' : vehStatus === 'REJECTED' ? '✕ REJECTED' : '⏳ PENDING'}
+                                  </span>
+                                  {veh.rejectionReason && (
+                                    <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '4px', maxWidth: '160px' }}>
+                                      Reason: {veh.rejectionReason}
+                                    </div>
+                                  )}
+                                </td>
+                                <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                    {vehStatus !== 'APPROVED' && (
+                                      <button
+                                        onClick={() => handleApproveVehicle(veh._id || veh.id || veh.vehicleId)}
+                                        disabled={processingVehicleAction}
+                                        style={{
+                                          padding: '0.35rem 0.75rem',
+                                          borderRadius: '6px',
+                                          border: 'none',
+                                          background: '#16a34a',
+                                          color: '#fff',
+                                          fontSize: '0.8rem',
+                                          fontWeight: 600,
+                                          cursor: 'pointer'
+                                        }}
+                                        title="Approve Vehicle"
+                                      >
+                                        ✓ Approve
+                                      </button>
+                                    )}
+                                    {vehStatus !== 'REJECTED' && (
+                                      <button
+                                        onClick={() => {
+                                          setRejectVehicleTarget(veh);
+                                          setVehicleRejectReason('');
+                                          setShowVehicleRejectModal(true);
+                                        }}
+                                        disabled={processingVehicleAction}
+                                        style={{
+                                          padding: '0.35rem 0.75rem',
+                                          borderRadius: '6px',
+                                          border: '1px solid #dc2626',
+                                          background: '#fff',
+                                          color: '#dc2626',
+                                          fontSize: '0.8rem',
+                                          fontWeight: 600,
+                                          cursor: 'pointer'
+                                        }}
+                                        title="Reject Vehicle"
+                                      >
+                                        ✕ Reject
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             {/* Vehicle Reject Modal */}
             {showVehicleRejectModal && (

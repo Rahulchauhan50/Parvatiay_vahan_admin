@@ -380,6 +380,8 @@ export default function App() {
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [vehicleStatusFilter, setVehicleStatusFilter] = useState('ALL');
   const [vehicleSearch, setVehicleSearch] = useState('');
+  const [vehiclePage, setVehiclePage] = useState(1);
+  const [vehicleLimit, setVehicleLimit] = useState(10);
   const [rejectVehicleTarget, setRejectVehicleTarget] = useState(null);
   const [vehicleRejectReason, setVehicleRejectReason] = useState('');
   const [showVehicleRejectModal, setShowVehicleRejectModal] = useState(false);
@@ -617,6 +619,12 @@ export default function App() {
     setRidePage(1);
     setBookingPage(1);
     setPackageBookingPage(1);
+    setVehiclePage(1);
+  };
+
+  const handleVehicleLimitChange = (newLimit) => {
+    setVehicleLimit(newLimit);
+    setVehiclePage(1);
   };
 
   const handleRideLimitChange = (newLimit) => {
@@ -3748,7 +3756,7 @@ export default function App() {
                 ].map(p => (
                   <button
                     key={p.key}
-                    onClick={() => setVehicleStatusFilter(p.key)}
+                    onClick={() => { setVehicleStatusFilter(p.key); setVehiclePage(1); }}
                     style={{
                       padding: '0.45rem 0.9rem',
                       borderRadius: '20px',
@@ -3788,7 +3796,7 @@ export default function App() {
                   className="form-control"
                   style={{ width: '280px', paddingLeft: '38px', fontSize: '0.82rem' }}
                   value={vehicleSearch}
-                  onChange={(e) => setVehicleSearch(e.target.value)}
+                  onChange={(e) => { setVehicleSearch(e.target.value); setVehiclePage(1); }}
                 />
               </div>
             </div>
@@ -3818,8 +3826,12 @@ export default function App() {
                 );
               });
 
+              const totalVehiclePages = Math.ceil(filteredList.length / vehicleLimit) || 1;
+              const paginatedVehicles = filteredList.slice((vehiclePage - 1) * vehicleLimit, vehiclePage * vehicleLimit);
+
               return (
                 <>
+                  {renderPagination(vehiclePage, totalVehiclePages, vehicleLimit, filteredList.length, setVehiclePage, handleVehicleLimitChange, true)}
                   {loadingVehicles ? (
                     <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading vehicles...</div>
                   ) : filteredList.length === 0 ? (
@@ -3841,7 +3853,7 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredList.map(veh => {
+                          {paginatedVehicles.map(veh => {
                             const vehStatus = veh.status || 'PENDING';
                             const ownerName = veh.user?.name || veh.userId?.name || veh.driverName || 'Driver';
                             const ownerMobile = veh.user?.mobile || veh.userId?.mobile || veh.driverMobile || 'N/A';
@@ -3939,6 +3951,7 @@ export default function App() {
                       </table>
                     </div>
                   )}
+                  {renderPagination(vehiclePage, totalVehiclePages, vehicleLimit, filteredList.length, setVehiclePage, handleVehicleLimitChange, false)}
                 </>
               );
             })()}

@@ -796,15 +796,20 @@ export default function App() {
       if (currentTab === 'dashboard') {
         setLoadingReports(true);
         const data = await api.getReportSummary();
-        setReports(data.summary);
+        setReports(data.summary || data.data?.summary || null);
       } else if (currentTab === 'users') {
         setLoadingUsers(true);
         const data = await api.listUsers();
-        setUsers(data.users);
+        setUsers(Array.isArray(data.users) ? data.users : (Array.isArray(data) ? data : []));
       } else if (currentTab === 'drivers') {
         setLoadingApps(true);
         const data = await api.listDriverApplications();
-        setApplications(data.applications || []);
+        const apps = Array.isArray(data.applications)
+          ? data.applications
+          : (Array.isArray(data.data?.applications)
+            ? data.data.applications
+            : (Array.isArray(data) ? data : []));
+        setApplications(apps);
         // Reset selections
         setSelectedApp(null);
         setSelectedAppVehicle(null);
@@ -813,19 +818,29 @@ export default function App() {
       } else if (currentTab === 'rides') {
         setLoadingRides(true);
         const data = await api.listRides(ridePage, rideLimit);
-        setRides(data.rides || []);
-        setRideTotalPages(data.pagination?.pages || 1);
-        setRideTotal(data.pagination?.total || 0);
+        const rList = Array.isArray(data.rides)
+          ? data.rides
+          : (Array.isArray(data.data?.rides)
+            ? data.data.rides
+            : (Array.isArray(data) ? data : []));
+        setRides(rList);
+        setRideTotalPages(data.pagination?.pages || data.data?.pagination?.pages || 1);
+        setRideTotal(data.pagination?.total || data.data?.pagination?.total || 0);
       } else if (currentTab === 'bookings') {
         setLoadingBookings(true);
         const data = await api.listBookings(bookingPage, bookingLimit);
-        setBookings(data.bookings || []);
-        setBookingTotalPages(data.pagination?.pages || 1);
-        setBookingTotal(data.pagination?.total || 0);
+        const bList = Array.isArray(data.bookings)
+          ? data.bookings
+          : (Array.isArray(data.data?.bookings)
+            ? data.data.bookings
+            : (Array.isArray(data) ? data : []));
+        setBookings(bList);
+        setBookingTotalPages(data.pagination?.pages || data.data?.pagination?.pages || 1);
+        setBookingTotal(data.pagination?.total || data.data?.pagination?.total || 0);
       } else if (currentTab === 'pricing') {
         setLoadingPricing(true);
         const data = await api.getPricingSettings();
-        const settings = data?.settings || {};
+        const settings = data?.settings || data?.data?.settings || {};
         const cachedAdvance = localStorage.getItem('pv_fullTaxiBookingAdvance');
         if ((settings.fullTaxiBookingAdvance === undefined || settings.fullTaxiBookingAdvance === null) && cachedAdvance !== null) {
           settings.fullTaxiBookingAdvance = Number(cachedAdvance);
@@ -839,9 +854,14 @@ export default function App() {
           api.listUsers(1, 1000).catch(() => ({ users: [] })),
           api.listAdminPackages().catch(() => []),
         ]);
-        setPackageBookings(bookingsData.bookings || []);
-        setUsers(usersData.users || []);
-        const pkgs = Array.isArray(packagesData) ? packagesData : packagesData?.packages || [];
+        const bList = Array.isArray(bookingsData.bookings)
+          ? bookingsData.bookings
+          : (Array.isArray(bookingsData.data?.bookings)
+            ? bookingsData.data.bookings
+            : (Array.isArray(bookingsData) ? bookingsData : []));
+        setPackageBookings(bList);
+        setUsers(Array.isArray(usersData.users) ? usersData.users : (Array.isArray(usersData) ? usersData : []));
+        const pkgs = Array.isArray(packagesData) ? packagesData : (Array.isArray(packagesData?.packages) ? packagesData.packages : []);
         setChardhamPackages(pkgs);
         setLoadingPackageBookings(false);
         setLoadingChardhamPackages(false);
@@ -851,7 +871,7 @@ export default function App() {
         setLoadingInsurances(true);
         try {
           const insData = await api.listDriverInsurances();
-          setDriverInsurances(insData);
+          setDriverInsurances(Array.isArray(insData) ? insData : []);
         } catch (err) {
           triggerAlert('error', err.message || 'Failed to load driver insurances');
         } finally {
@@ -860,14 +880,19 @@ export default function App() {
       } else if (currentTab === 'policies') {
         setLoadingPolicies(true);
         const data = await api.listAdminPolicies();
-        const list = Array.isArray(data) ? data : (data.policies || []);
+        const list = Array.isArray(data) ? data : (Array.isArray(data.policies) ? data.policies : []);
         setPoliciesList(list);
         handleSelectPolicySlug(activePolicySlug, list);
         setLoadingPolicies(false);
       } else if (currentTab === 'locations') {
         setLoadingLocations(true);
         const data = await api.listAdminLocations();
-        setLocations(data.locations || []);
+        const locList = Array.isArray(data.locations)
+          ? data.locations
+          : (Array.isArray(data.data?.locations)
+            ? data.data.locations
+            : (Array.isArray(data) ? data : []));
+        setLocations(locList);
       }
     } catch (err) {
       console.error(err);
@@ -1498,7 +1523,7 @@ export default function App() {
     e.preventDefault();
     if (!selectedPackageBooking || !allocationDriverId) return;
 
-    const driver = users.find(u => (u.id === allocationDriverId || u._id === allocationDriverId));
+    const driver = (Array.isArray(users) ? users : []).find(u => (u.id === allocationDriverId || u._id === allocationDriverId));
     if (!driver || !driver.vehicle) {
       triggerAlert('error', 'Selected driver does not have an active registered vehicle.');
       return;
@@ -1545,7 +1570,7 @@ export default function App() {
   };
 
   // Filtering users
-  const filteredUsers = users.filter(u => {
+  const filteredUsers = (Array.isArray(users) ? users : []).filter(u => {
     if (userRoleFilter !== 'ALL' && !u.roles?.includes(userRoleFilter)) {
       return false;
     }
@@ -1566,7 +1591,7 @@ export default function App() {
   });
 
   const paginatedUsers = filteredUsers.slice((userPage - 1) * userLimit, userPage * userLimit);
-  const paginatedDriverApps = applications.slice((driverAppPage - 1) * driverAppLimit, driverAppPage * driverAppLimit);
+  const paginatedDriverApps = (Array.isArray(applications) ? applications : []).slice((driverAppPage - 1) * driverAppLimit, driverAppPage * driverAppLimit);
 
   const renderRoutePoint = (point) => {
     if (!point) return 'N/A';
@@ -1978,8 +2003,8 @@ export default function App() {
                     <div className="card stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateToTab('bookings')}>
                       <div className="stat-info">
                         <span className="stat-label">Total Revenue</span>
-                        <span className="stat-value">₹{reports.payments.totalAmount.toLocaleString()}</span>
-                        <span className="stat-trend positive">✓ {reports.payments.successful} Successful</span>
+                        <span className="stat-value">₹{(reports.payments?.totalAmount ?? 0).toLocaleString()}</span>
+                        <span className="stat-trend positive">✓ {reports.payments?.successful ?? 0} Successful</span>
                       </div>
                       <div className="stat-icon-wrapper green">₹</div>
                     </div>
@@ -1987,8 +2012,8 @@ export default function App() {
                     <div className="card stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateToTab('rides')}>
                       <div className="stat-info">
                         <span className="stat-label">Total Rides</span>
-                        <span className="stat-value">{reports.rides.total}</span>
-                        <span className="stat-trend positive">✓ {reports.rides.completed} Completed</span>
+                        <span className="stat-value">{reports.rides?.total ?? 0}</span>
+                        <span className="stat-trend positive">✓ {reports.rides?.completed ?? 0} Completed</span>
                       </div>
                       <div className="stat-icon-wrapper orange">🚗</div>
                     </div>
@@ -1996,8 +2021,8 @@ export default function App() {
                     <div className="card stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateToTab('bookings')}>
                       <div className="stat-info">
                         <span className="stat-label">Bookings</span>
-                        <span className="stat-value">{reports.bookings.total}</span>
-                        <span className="stat-trend positive">✓ {reports.bookings.confirmed} Active</span>
+                        <span className="stat-value">{reports.bookings?.total ?? 0}</span>
+                        <span className="stat-trend positive">✓ {reports.bookings?.confirmed ?? 0} Active</span>
                       </div>
                       <div className="stat-icon-wrapper blue">🎫</div>
                     </div>
@@ -2005,8 +2030,8 @@ export default function App() {
                     <div className="card stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateToTab('users')}>
                       <div className="stat-info">
                         <span className="stat-label">Total Users</span>
-                        <span className="stat-value">{reports.users.totalUsers ?? reports.users.totalPassengers}</span>
-                        <span className="stat-trend positive">+{reports.users.newThisMonth} This Month</span>
+                        <span className="stat-value">{reports.users?.totalUsers ?? reports.users?.totalPassengers ?? 0}</span>
+                        <span className="stat-trend positive">+{reports.users?.newThisMonth ?? 0} This Month</span>
                       </div>
                       <div className="stat-icon-wrapper red">👥</div>
                     </div>
@@ -2014,8 +2039,8 @@ export default function App() {
                     <div className="card stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateToTab('drivers')}>
                       <div className="stat-info">
                         <span className="stat-label">Approved Drivers</span>
-                        <span className="stat-value">{reports.users.approvedDrivers ?? reports.users.totalDrivers ?? 0}</span>
-                        <span className="stat-trend positive">✓ {reports.users.totalDrivers ?? 0} Total Drivers</span>
+                        <span className="stat-value">{reports.users?.approvedDrivers ?? reports.users?.totalDrivers ?? 0}</span>
+                        <span className="stat-trend positive">✓ {reports.users?.totalDrivers ?? 0} Total Drivers</span>
                       </div>
                       <div className="stat-icon-wrapper green" style={{ fontSize: '1.4rem' }}>🧑‍✈️</div>
                     </div>
@@ -2023,11 +2048,11 @@ export default function App() {
                     <div className="card stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateToTab('drivers')}>
                       <div className="stat-info">
                         <span className="stat-label">Pending Driver Apps</span>
-                        <span className="stat-value" style={{ color: (reports.users.pendingDrivers ?? 0) > 0 ? 'var(--warning)' : 'inherit' }}>
-                          {reports.users.pendingDrivers ?? 0}
+                        <span className="stat-value" style={{ color: (reports.users?.pendingDrivers ?? 0) > 0 ? 'var(--warning)' : 'inherit' }}>
+                          {reports.users?.pendingDrivers ?? 0}
                         </span>
-                        <span className="stat-trend" style={{ color: (reports.users.pendingDrivers ?? 0) > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
-                          {(reports.users.pendingDrivers ?? 0) > 0 ? '⚠ Action Required' : '✓ All Clear'}
+                        <span className="stat-trend" style={{ color: (reports.users?.pendingDrivers ?? 0) > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
+                          {(reports.users?.pendingDrivers ?? 0) > 0 ? '⚠ Action Required' : '✓ All Clear'}
                         </span>
                       </div>
                       <div className="stat-icon-wrapper orange" style={{ fontSize: '1.4rem' }}>📋</div>
@@ -2040,7 +2065,7 @@ export default function App() {
                         <h3>Revenue by Payment Method</h3>
                       </div>
                       <div className="chart-bar-container" style={{ marginTop: '1.5rem' }}>
-                        {Object.entries(reports.revenue.totalByPaymentMethod).map(([method, amount]) => {
+                        {(reports.revenue?.totalByPaymentMethod ? Object.entries(reports.revenue.totalByPaymentMethod) : []).map(([method, amount]) => {
                           const total = reports.revenue.totalCollected || 1;
                           const percent = Math.round((amount / total) * 100);
                           return (
@@ -2066,7 +2091,7 @@ export default function App() {
                         <h3>Popular Hill Routes</h3>
                       </div>
                       <div className="route-list" style={{ marginTop: '1rem' }}>
-                        {reports.revenue.topRoutes.map((route, i) => (
+                        {(reports.revenue?.topRoutes || []).map((route, i) => (
                           <div className="route-item" key={i}>
                             <div className="route-meta">
                               <span className="route-names">{route.route}</span>
@@ -3556,7 +3581,7 @@ export default function App() {
                                   </button>
                                 </div>
                                 {(() => {
-                                  const passengerObj = users.find(u => (u.id === booking.passengerUserId || u._id === booking.passengerUserId)) || booking.passengerSnapshot;
+                                  const passengerObj = (Array.isArray(users) ? users : []).find(u => (u.id === booking.passengerUserId || u._id === booking.passengerUserId)) || booking.passengerSnapshot;
                                   return passengerObj ? (
                                     <div style={{ marginTop: '4px' }}>
                                       {passengerObj.name && <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main)' }}>{passengerObj.name}</div>}
@@ -3625,7 +3650,7 @@ export default function App() {
                                 {booking.isDriverAllocated || booking.driver || booking.allocatedDriverUserId ? (
                                   (() => {
                                     const driverId = booking.allocatedDriverUserId || booking.driverId || (booking.driver && (typeof booking.driver === 'object' ? (booking.driver.id || booking.driver._id) : booking.driver));
-                                    const driverObj = users.find(u => u.id === driverId || u._id === driverId) || booking.allocatedDriverSnapshot;
+                                    const driverObj = (Array.isArray(users) ? users : []).find(u => u.id === driverId || u._id === driverId) || booking.allocatedDriverSnapshot;
                                     const name = driverObj ? driverObj.name : (booking.allocatedDriverSnapshot ? booking.allocatedDriverSnapshot.name : 'Allocated');
                                     const mobile = driverObj ? driverObj.mobile : (booking.allocatedDriverSnapshot ? booking.allocatedDriverSnapshot.mobile : '');
                                     const vehicle = driverObj?.vehicle || booking.allocatedVehicleSnapshot || (booking.driver && typeof booking.driver === 'object' ? booking.driver.vehicle : null);

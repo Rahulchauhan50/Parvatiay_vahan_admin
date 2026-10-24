@@ -1,9 +1,17 @@
 const BASE_URL = 'https://api.parvatiyavahan.com';
 
 // Auth helpers
-export const getToken = () => localStorage.getItem('admin_token');
+export const getToken = () => {
+  const token = localStorage.getItem('admin_token');
+  if (!token || token === 'undefined' || token === 'null') return null;
+  return token;
+};
 export const setToken = (token) => localStorage.setItem('admin_token', token);
-export const clearToken = () => { localStorage.removeItem('admin_token'); localStorage.removeItem('admin_user'); };
+export const clearToken = () => {
+  localStorage.removeItem('admin_token');
+  localStorage.removeItem('admin_user');
+  localStorage.removeItem('admin_refresh_token');
+};
 
 // Intercept all fetch requests to handle 401 Unauthorized globally
 const originalFetch = window.fetch;
@@ -88,7 +96,14 @@ export const listUsers = async () => {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || data.message || 'Unauthorized');
-  return { users: data.data?.users || data.users || data };
+  const userList = Array.isArray(data.data)
+    ? data.data
+    : (Array.isArray(data.data?.users)
+      ? data.data.users
+      : (Array.isArray(data.users)
+        ? data.users
+        : (Array.isArray(data) ? data : [])));
+  return { users: userList };
 };
 
 export const updateUserStatus = async (userId, status) => {
@@ -265,7 +280,8 @@ export const listAdminPackages = async () => {
     });
     if (res.ok) {
       const data = await res.json();
-      return data.data?.packages || data.packages || data;
+      const list = Array.isArray(data.data) ? data.data : (data.data?.packages || data.packages || data);
+      return Array.isArray(list) ? list : (list.packages || []);
     }
   } catch (_) {}
 
@@ -273,7 +289,8 @@ export const listAdminPackages = async () => {
   const res = await fetch(`${BASE_URL}/packages`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || data.message || 'Failed to fetch packages');
-  return data.data?.packages || data.packages || data;
+  const fallbackList = Array.isArray(data.data) ? data.data : (data.data?.packages || data.packages || data);
+  return Array.isArray(fallbackList) ? fallbackList : (fallbackList.packages || []);
 };
 
 export const updateAdminPackage = async (code, updateData) => {
@@ -311,7 +328,14 @@ export const listAdminLocations = async () => {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || data.message || 'Unauthorized');
-  return data.data || data;
+  const locList = Array.isArray(data.data)
+    ? data.data
+    : (Array.isArray(data.data?.locations)
+      ? data.data.locations
+      : (Array.isArray(data.locations)
+        ? data.locations
+        : (Array.isArray(data) ? data : [])));
+  return { locations: locList };
 };
 
 export const createAdminLocation = async (locationData) => {
@@ -484,7 +508,14 @@ export const listAdminVehicles = async (status = '', page = 1, limit = 200) => {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || data.error?.message || 'Failed to list vehicles');
-  return data.data?.vehicles || data.vehicles || data.data || data;
+  const vehList = Array.isArray(data.data)
+    ? data.data
+    : (Array.isArray(data.data?.vehicles)
+      ? data.data.vehicles
+      : (Array.isArray(data.vehicles)
+        ? data.vehicles
+        : (Array.isArray(data) ? data : [])));
+  return vehList;
 };
 
 export const approveAdminVehicle = async (vehicleId) => {
